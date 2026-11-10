@@ -1,0 +1,26 @@
+name: Publicar build de Agathia
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Solo probar (no publica en npm)'
+        type: boolean
+        default: true
+permissions:
+  contents: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - run: bun install
+      - run: node scripts/agathia-patch.mjs
+      - run: bun run build
+      - run: npm publish --access public --ignore-scripts ${{ inputs.dry_run && '--dry-run' || '' }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
