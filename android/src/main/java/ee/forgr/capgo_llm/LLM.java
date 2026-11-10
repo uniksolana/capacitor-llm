@@ -486,14 +486,16 @@ public class LLM {
         ChatSession session;
         boolean releaseActiveGeneration = false;
         synchronized (this) {
+            // A close already queued owns this chat; aggregate duplicate callbacks
+            // before checking the active-generation state.
+            if (closingChatIds.contains(chatId)) {
+                addCloseCallbackLocked(chatId, onClosed);
+                return;
+            }
             if (chatId.equals(activeLiteRtChatId) && !completedLiteRtChatIds.remove(chatId)) {
                 pendingChatClosures.add(chatId);
                 addCloseCallbackLocked(chatId, onClosed);
                 android.util.Log.d("LLM", "Deferring close until LiteRT-LM generation callback completes " + chatId);
-                return;
-            }
-            if (closingChatIds.contains(chatId)) {
-                addCloseCallbackLocked(chatId, onClosed);
                 return;
             }
             session = chatSessions.remove(chatId);
@@ -529,6 +531,7 @@ public class LLM {
                 Runnable queuedCallbacks;
                 synchronized (LLM.this) {
                     closingChatIds.remove(chatId);
+                    pendingChatClosures.remove(chatId);
                     completedLiteRtChatIds.remove(chatId);
                     if (releaseActiveGeneration && chatId.equals(activeLiteRtChatId)) {
                         activeLiteRtChatId = null;
