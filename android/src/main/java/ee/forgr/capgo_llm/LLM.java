@@ -486,13 +486,12 @@ public class LLM {
         synchronized (this) {
             if (chatId.equals(activeLiteRtChatId)) {
                 pendingChatClosures.add(chatId);
-                if (onClosed != null) {
-                    pendingCloseCallbacks.merge(chatId, onClosed, (first, second) -> () -> {
-                        first.run();
-                        second.run();
-                    });
-                }
+                addCloseCallbackLocked(chatId, onClosed);
                 android.util.Log.d("LLM", "Deferring close for active LiteRT-LM chat " + chatId);
+                return;
+            }
+            if (closingChatIds.contains(chatId)) {
+                addCloseCallbackLocked(chatId, onClosed);
                 return;
             }
             session = chatSessions.remove(chatId);
@@ -519,22 +518,36 @@ public class LLM {
             try {
                 closeChatSession(chatId, session);
             } finally {
+                Runnable queuedCallbacks;
                 synchronized (LLM.this) {
                     closingChatIds.remove(chatId);
                     if (releaseActiveGeneration && chatId.equals(activeLiteRtChatId)) {
                         activeLiteRtChatId = null;
                     }
+                    queuedCallbacks = pendingCloseCallbacks.remove(chatId);
                     LLM.this.notifyAll();
                 }
-                if (onClosed != null) {
-                    try {
-                        onClosed.run();
-                    } catch (RuntimeException callbackError) {
-                        android.util.Log.e("LLM", "Chat close completion callback failed", callbackError);
-                    }
-                }
+                runCloseCallbackSafely(onClosed);
+                runCloseCallbackSafely(queuedCallbacks);
             }
         });
+    }
+
+    private void addCloseCallbackLocked(String chatId, Runnable callback) {
+        if (callback == null) return;
+        pendingCloseCallbacks.merge(chatId, callback, (first, second) -> () -> {
+            runCloseCallbackSafely(first);
+            runCloseCallbackSafely(second);
+        });
+    }
+
+    private void runCloseCallbackSafely(Runnable callback) {
+        if (callback == null) return;
+        try {
+            callback.run();
+        } catch (RuntimeException callbackError) {
+            android.util.Log.e("LLM", "Chat close completion callback failed", callbackError);
+        }
     }
 
     private void closeChatSession(String chatId, ChatSession session) {
