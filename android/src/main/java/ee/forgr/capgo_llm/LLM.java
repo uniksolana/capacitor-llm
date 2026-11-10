@@ -82,7 +82,7 @@ public class LLM {
         return instance;
     }
 
-    public void setModel(
+    public synchronized void setModel(
         String path,
         String modelType,
         Integer maxTokens,
@@ -93,6 +93,10 @@ public class LLM {
         String androidGeminiBackend,
         ModelLoadCallback callback
     ) {
+        if (activeLiteRtChatId != null) {
+            if (callback != null) callback.onError("Espera a que termine la generación local antes de cambiar el modelo.");
+            return;
+        }
         ModelLoadRequest request = nextLoadRequest(
             path,
             modelType,
