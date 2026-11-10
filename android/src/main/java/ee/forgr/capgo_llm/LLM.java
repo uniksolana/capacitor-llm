@@ -328,21 +328,21 @@ public class LLM {
                         return;
                     }
 
-                    resetModelState();
-                    if (callback != null) {
-                        callback.onError("Gemini Nano is " + GeminiNanoAvailability.describe(status) + " on this device");
-                    }
+                    String error = "Gemini Nano is " + GeminiNanoAvailability.describe(status) + " on this device";
+                    String cleanupError = resetModelStateSafely();
+                    if (cleanupError != null) error += "; " + cleanupError;
+                    if (callback != null) callback.onError(error);
                 } catch (CancellationException | ExecutionException exception) {
-                    resetModelState();
-                    if (callback != null) {
-                        callback.onError(exception.getMessage());
-                    }
+                    String error = exception.getMessage();
+                    String cleanupError = resetModelStateSafely();
+                    if (cleanupError != null) error += "; " + cleanupError;
+                    if (callback != null) callback.onError(error);
                 } catch (InterruptedException exception) {
                     Thread.currentThread().interrupt();
-                    resetModelState();
-                    if (callback != null) {
-                        callback.onError(exception.getMessage());
-                    }
+                    String error = exception.getMessage();
+                    String cleanupError = resetModelStateSafely();
+                    if (cleanupError != null) error += "; " + cleanupError;
+                    if (callback != null) callback.onError(error);
                 }
             },
             executor
@@ -359,14 +359,13 @@ public class LLM {
 
         GeminiNanoAgentClient client = GeminiNanoAgentClient.create(context);
         if (!client.isCompiledIn()) {
-            resetModelState();
-            if (callback != null) {
-                callback.onError(
-                    "ML Kit GenAI Agent (genai-agent) is not included in this build. " +
-                        "Set capacitorLLM.genaiAgent.include=true in android/gradle.properties " +
-                        "or enable CapgoLLM.android.genaiAgent in capacitor.config.ts, then run cap sync."
-                );
-            }
+            String error =
+                "ML Kit GenAI Agent (genai-agent) is not included in this build. " +
+                "Set capacitorLLM.genaiAgent.include=true in android/gradle.properties " +
+                "or enable CapgoLLM.android.genaiAgent in capacitor.config.ts, then run cap sync.";
+            String cleanupError = resetModelStateSafely();
+            if (cleanupError != null) error += "; " + cleanupError;
+            if (callback != null) callback.onError(error);
             return;
         }
 
@@ -394,10 +393,9 @@ public class LLM {
                         notifySupersededLoad(callback);
                         return;
                     }
-                    resetModelState();
-                    if (callback != null) {
-                        callback.onError(error);
-                    }
+                    String cleanupError = resetModelStateSafely();
+                    if (cleanupError != null) error += "; " + cleanupError;
+                    if (callback != null) callback.onError(error);
                 }
             }
         );
@@ -1048,6 +1046,16 @@ public class LLM {
 
     public synchronized String getReadiness() {
         return isReady ? "ready" : "not_ready";
+    }
+
+    private String resetModelStateSafely() {
+        try {
+            resetModelState();
+            return null;
+        } catch (RuntimeException exception) {
+            android.util.Log.e("LLM", "Model reset stopped because a chat session could not be closed", exception);
+            return "No se pudo completar la limpieza de las sesiones locales: " + exception.getMessage();
+        }
     }
 
     private synchronized void resetModelState() {
