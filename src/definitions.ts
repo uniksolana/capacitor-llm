@@ -16,6 +16,12 @@ export interface LLMPlugin {
   sendMessage(options: { chatId: string; message: string }): Promise<void>;
 
   /**
+   * Closes a chat session and releases its native conversation resources.
+   * If the session is still generating, native cleanup is deferred until completion.
+   */
+  closeChat(options: { chatId: string }): Promise<void>;
+
+  /**
    * Gets the readiness status of the LLM
    * @returns Promise with readiness status string
    */
