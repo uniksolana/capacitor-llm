@@ -34,10 +34,10 @@ if (pluginPatched === plugin) {
   process.exit(1);
 }
 writeFileSync(pluginPath, pluginPatched);
-console.log('LLMPlugin.java: pluginVersion = 8.2.1-agathia.3');
+console.log('LLMPlugin.java: pluginVersion = 8.2.1-agathia.4');
 
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 pkg.name = '@uniksolana/capacitor-llm';
-pkg.version = '8.2.1-agathia.3';
+pkg.version = '8.2.1-agathia.4';
 writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
 console.log(`package.json: ${pkg.name}@${pkg.version}`);
