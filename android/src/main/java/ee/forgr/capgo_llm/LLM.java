@@ -621,18 +621,16 @@ public class LLM {
 
     private void closeChatSession(String chatId, ChatSession session) throws Exception {
         if (session == null) return;
-        if (session.conversation != null && !session.conversationClosed) {
-            session.conversation.close();
-            session.conversationClosed = true;
-        }
-        if (
-            session.backendType == BackendType.GEMINI_NANO_AGENT &&
-            geminiNanoAgentClient != null &&
-            !session.agentSessionClosed
-        ) {
-            geminiNanoAgentClient.closeSession(chatId);
-            session.agentSessionClosed = true;
-        }
+        session.closeState.close(
+            () -> {
+                if (session.conversation != null) session.conversation.close();
+            },
+            () -> {
+                if (session.backendType == BackendType.GEMINI_NANO_AGENT && geminiNanoAgentClient != null) {
+                    geminiNanoAgentClient.closeSession(chatId);
+                }
+            }
+        );
     }
 
     private void finishLiteRtGeneration(String chatId) {
@@ -1144,8 +1142,7 @@ public class LLM {
         private final BackendType backendType;
         private final Conversation conversation;
         private final StringBuilder history;
-        private boolean conversationClosed;
-        private boolean agentSessionClosed;
+        private final ChatSessionCloseState closeState = new ChatSessionCloseState();
 
         private ChatSession(BackendType backendType, Conversation conversation) {
             this.backendType = backendType;
