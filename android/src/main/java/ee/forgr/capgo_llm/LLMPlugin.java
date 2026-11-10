@@ -90,6 +90,9 @@ public class LLMPlugin extends Plugin {
             call.resolve();
         } catch (IllegalStateException exception) {
             call.reject(exception.getMessage());
+        } catch (RuntimeException exception) {
+            android.util.Log.e("CapgoLLM", "Unexpected failure while starting generation", exception);
+            call.reject("Failed to start local generation", exception);
         }
     }
 
@@ -124,35 +127,40 @@ public class LLMPlugin extends Plugin {
         String backend = call.getString("backend");
         String androidGeminiBackend = call.getString("androidGeminiBackend");
 
-        llm.setModel(
-            path,
-            modelType,
-            maxTokens,
-            topk,
-            temperature,
-            randomSeed,
-            backend,
-            androidGeminiBackend,
-            new LLM.ModelLoadCallback() {
-                @Override
-                public void onSuccess() {
-                    // Notify readiness change
-                    JSObject readinessData = new JSObject();
-                    readinessData.put("readiness", "ready");
-                    notifyListeners("readinessChange", readinessData);
-                    call.resolve();
-                }
+        try {
+            llm.setModel(
+                path,
+                modelType,
+                maxTokens,
+                topk,
+                temperature,
+                randomSeed,
+                backend,
+                androidGeminiBackend,
+                new LLM.ModelLoadCallback() {
+                    @Override
+                    public void onSuccess() {
+                        // Notify readiness change
+                        JSObject readinessData = new JSObject();
+                        readinessData.put("readiness", "ready");
+                        notifyListeners("readinessChange", readinessData);
+                        call.resolve();
+                    }
 
-                @Override
-                public void onError(String error) {
-                    // Notify readiness change
-                    JSObject readinessData = new JSObject();
-                    readinessData.put("readiness", "Failed to load model: " + error);
-                    notifyListeners("readinessChange", readinessData);
-                    call.reject("Failed to load model", error);
+                    @Override
+                    public void onError(String error) {
+                        // Notify readiness change
+                        JSObject readinessData = new JSObject();
+                        readinessData.put("readiness", "Failed to load model: " + error);
+                        notifyListeners("readinessChange", readinessData);
+                        call.reject("Failed to load model", error);
+                    }
                 }
-            }
-        );
+            );
+        } catch (RuntimeException exception) {
+            android.util.Log.e("CapgoLLM", "Unexpected failure while setting local model", exception);
+            call.reject("Failed to initialize local model", exception);
+        }
     }
 
     @PluginMethod
