@@ -1,0 +1,27 @@
+name: Verificar cierre seguro de Agathia
+on:
+  push:
+    branches:
+      - fix/agathia-safe-conversation-close
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: bun install --frozen-lockfile
+      - run: node scripts/agathia-patch.mjs
+      - run: bun run build
+      - name: Verificar compilación Android
+        run: bun run verify:android
+      - name: Comprobar contenido del paquete
+        run: npm pack --dry-run
