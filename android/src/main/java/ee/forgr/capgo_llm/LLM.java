@@ -33,6 +33,7 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -50,8 +51,11 @@ public class LLM {
 
     private final Context context;
     private final Executor executor;
+    private final ExecutorService lifecycleExecutor;
     private final Map<String, ChatSession> chatSessions;
     private final Set<String> pendingChatClosures = ConcurrentHashMap.newKeySet();
+    private final Set<String> closingChatIds = ConcurrentHashMap.newKeySet();
+    private final Map<String, Runnable> pendingCloseCallbacks = new ConcurrentHashMap<>();
     private String activeLiteRtChatId;
 
     private Engine engine;
@@ -73,6 +77,7 @@ public class LLM {
         this.context = context;
         this.chatSessions = new ConcurrentHashMap<>();
         this.executor = Executors.newSingleThreadExecutor();
+        this.lifecycleExecutor = Executors.newSingleThreadExecutor();
     }
 
     public static LLM getInstance(Context context) {
@@ -93,8 +98,8 @@ public class LLM {
         String androidGeminiBackend,
         ModelLoadCallback callback
     ) {
-        if (activeLiteRtChatId != null) {
-            if (callback != null) callback.onError("Espera a que termine la generación local antes de cambiar el modelo.");
+        if (activeLiteRtChatId != null || !closingChatIds.isEmpty()) {
+            if (callback != null) callback.onError("Espera a que termine la generación y la limpieza de la sesión local antes de cambiar el modelo.");
             return;
         }
         ModelLoadRequest request = nextLoadRequest(
@@ -465,19 +470,71 @@ public class LLM {
         }
     }
 
-    /** Close one conversation. If it is generating, defer native cleanup until LiteRT-LM finishes. */
-    public void closeChat(String chatId) {
-        if (chatId == null || chatId.isBlank()) return;
+    /**
+     * Close a conversation away from the LiteRT-LM JNI callback thread.
+     * Conversation.close() waits for the native session's pending task before
+     * deleting its native handle, so this executor must remain independent of
+     * the callback that completes that task.
+     */
+    public void closeChat(String chatId, Runnable onClosed) {
+        if (chatId == null || chatId.isBlank()) {
+            if (onClosed != null) onClosed.run();
+            return;
+        }
+
         ChatSession session;
         synchronized (this) {
             if (chatId.equals(activeLiteRtChatId)) {
                 pendingChatClosures.add(chatId);
+                if (onClosed != null) {
+                    pendingCloseCallbacks.merge(chatId, onClosed, (first, second) -> () -> {
+                        first.run();
+                        second.run();
+                    });
+                }
                 android.util.Log.d("LLM", "Deferring close for active LiteRT-LM chat " + chatId);
                 return;
             }
             session = chatSessions.remove(chatId);
+            if (session != null && session.conversation != null) {
+                closingChatIds.add(chatId);
+            }
         }
-        closeChatSession(chatId, session);
+
+        if (session == null) {
+            if (onClosed != null) onClosed.run();
+            return;
+        }
+
+        enqueueChatSessionClose(chatId, session, onClosed, false);
+    }
+
+    private void enqueueChatSessionClose(
+        String chatId,
+        ChatSession session,
+        Runnable onClosed,
+        boolean releaseActiveGeneration
+    ) {
+        lifecycleExecutor.execute(() -> {
+            try {
+                closeChatSession(chatId, session);
+            } finally {
+                synchronized (LLM.this) {
+                    closingChatIds.remove(chatId);
+                    if (releaseActiveGeneration && chatId.equals(activeLiteRtChatId)) {
+                        activeLiteRtChatId = null;
+                    }
+                    LLM.this.notifyAll();
+                }
+                if (onClosed != null) {
+                    try {
+                        onClosed.run();
+                    } catch (RuntimeException callbackError) {
+                        android.util.Log.e("LLM", "Chat close completion callback failed", callbackError);
+                    }
+                }
+            }
+        });
     }
 
     private void closeChatSession(String chatId, ChatSession session) {
@@ -496,16 +553,34 @@ public class LLM {
 
     private void finishLiteRtGeneration(String chatId) {
         ChatSession sessionToClose = null;
+        Runnable closeCallback = null;
         synchronized (this) {
-            if (chatId.equals(activeLiteRtChatId)) activeLiteRtChatId = null;
-            if (pendingChatClosures.remove(chatId)) sessionToClose = chatSessions.remove(chatId);
+            if (pendingChatClosures.remove(chatId)) {
+                sessionToClose = chatSessions.remove(chatId);
+                closeCallback = pendingCloseCallbacks.remove(chatId);
+                if (sessionToClose != null && sessionToClose.conversation != null) {
+                    closingChatIds.add(chatId);
+                } else if (chatId.equals(activeLiteRtChatId)) {
+                    activeLiteRtChatId = null;
+                }
+            } else if (chatId.equals(activeLiteRtChatId)) {
+                activeLiteRtChatId = null;
+            }
         }
-        closeChatSession(chatId, sessionToClose);
+
+        if (sessionToClose != null) {
+            enqueueChatSessionClose(chatId, sessionToClose, closeCallback, true);
+        } else if (closeCallback != null) {
+            closeCallback.run();
+        }
     }
 
     public synchronized String createChat() {
         if (!isReady) {
             throw new IllegalStateException("Model not ready");
+        }
+        if (activeLiteRtChatId != null || !closingChatIds.isEmpty()) {
+            throw new IllegalStateException("Espera a que termine la operación y la limpieza de la sesión local.");
         }
 
         String chatId = UUID.randomUUID().toString();
@@ -569,6 +644,9 @@ public class LLM {
 
             if (!isReady) {
                 throw new IllegalStateException("Model not ready");
+            }
+            if (!closingChatIds.isEmpty()) {
+                throw new IllegalStateException("El motor local está limpiando una sesión anterior. Espera un momento.");
             }
 
             inference = llmInference;
