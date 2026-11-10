@@ -102,8 +102,9 @@ public class LLM {
         String androidGeminiBackend,
         ModelLoadCallback callback
     ) {
-        if (activeLiteRtChatId != null || !closingChatIds.isEmpty() || !failedCloseChatIds.isEmpty()) {
-            if (callback != null) callback.onError("Hay una generación o una sesión local cuya limpieza no ha terminado correctamente. Reintenta cerrar la sesión antes de cambiar el modelo.");
+        boolean activeCleanupFailed = activeLiteRtChatId != null && failedCloseChatIds.contains(activeLiteRtChatId);
+        if ((activeLiteRtChatId != null && !activeCleanupFailed) || !closingChatIds.isEmpty()) {
+            if (callback != null) callback.onError("Espera a que termine la generación y la limpieza de la sesión local antes de cambiar el modelo.");
             return;
         }
         ModelLoadRequest request = nextLoadRequest(
@@ -1111,6 +1112,10 @@ public class LLM {
                 closeChatSession(chatId, session);
                 chatSessions.remove(chatId, session);
                 failedCloseChatIds.remove(chatId);
+                if (chatId.equals(activeLiteRtChatId)) {
+                    activeLiteRtChatId = null;
+                    completedLiteRtChatIds.remove(chatId);
+                }
             } catch (Exception exception) {
                 failedCloseChatIds.add(chatId);
                 throw new IllegalStateException(
