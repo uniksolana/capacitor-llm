@@ -21,8 +21,23 @@ if (patched === java) {
 writeFileSync(javaPath, patched);
 console.log('LLM.java parcheado: visionBackend y audioBackend = null');
 
+const pluginPath = 'android/src/main/java/ee/forgr/capgo_llm/LLMPlugin.java';
+const plugin = readFileSync(pluginPath, 'utf8');
+const versionPattern = /private final String pluginVersion = "[^"]+";/;
+if (!versionPattern.test(plugin)) {
+  console.error('ERROR: no se encontró pluginVersion en LLMPlugin.java. No se aplica ningún cambio.');
+  process.exit(1);
+}
+const pluginPatched = plugin.replace(versionPattern, 'private final String pluginVersion = "8.2.1-agathia.3";');
+if (pluginPatched === plugin) {
+  console.error('ERROR: pluginVersion no cambió.');
+  process.exit(1);
+}
+writeFileSync(pluginPath, pluginPatched);
+console.log('LLMPlugin.java: pluginVersion = 8.2.1-agathia.3');
+
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 pkg.name = '@uniksolana/capacitor-llm';
-pkg.version = '8.2.1-agathia.2';
+pkg.version = '8.2.1-agathia.3';
 writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
 console.log(`package.json: ${pkg.name}@${pkg.version}`);
