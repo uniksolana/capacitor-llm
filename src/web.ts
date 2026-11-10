@@ -57,6 +57,16 @@ export class CapgoLLMWeb extends WebPlugin implements LLMPlugin {
     return { id: chatId };
   }
 
+  async closeChat(options: { chatId: string }): Promise<void> {
+    const session = this.chatSessions.get(options.chatId);
+    if (!session) {
+      return;
+    }
+
+    session.isActive = false;
+    this.chatSessions.delete(options.chatId);
+  }
+
   async sendMessage(options: { chatId: string; message: string }): Promise<void> {
     const session = this.chatSessions.get(options.chatId);
     if (!session) {
