@@ -32,6 +32,21 @@ public class LLMPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void closeChat(PluginCall call) {
+        String chatId = call.getString("chatId");
+        if (chatId == null || chatId.isBlank()) {
+            call.reject("chatId is required");
+            return;
+        }
+        try {
+            llm.closeChat(chatId);
+            call.resolve();
+        } catch (Exception exception) {
+            call.reject("Failed to close chat", exception);
+        }
+    }
+
+    @PluginMethod
     public void sendMessage(PluginCall call) {
         String chatId = call.getString("chatId");
         String message = call.getString("message");
