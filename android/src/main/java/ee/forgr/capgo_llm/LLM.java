@@ -600,7 +600,8 @@ public class LLM {
         if (sessionToClose != null) {
             enqueueChatSessionClose(chatId, sessionToClose, closeCallback, true);
         } else if (closeCallback != null) {
-            lifecycleExecutor.execute(() -> runCloseCallbackSafely(closeCallback));
+            Runnable callbackToRun = closeCallback;
+            lifecycleExecutor.execute(() -> runCloseCallbackSafely(callbackToRun));
         }
     }
 
