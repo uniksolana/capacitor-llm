@@ -39,8 +39,7 @@ public class LLMPlugin extends Plugin {
             return;
         }
         try {
-            llm.closeChat(chatId);
-            call.resolve();
+            llm.closeChat(chatId, () -> call.resolve());
         } catch (Exception exception) {
             call.reject("Failed to close chat", exception);
         }
