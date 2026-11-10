@@ -529,6 +529,7 @@ public class LLM {
                 Runnable queuedCallbacks;
                 synchronized (LLM.this) {
                     closingChatIds.remove(chatId);
+                    completedLiteRtChatIds.remove(chatId);
                     if (releaseActiveGeneration && chatId.equals(activeLiteRtChatId)) {
                         activeLiteRtChatId = null;
                     }
