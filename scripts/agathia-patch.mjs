@@ -23,6 +23,6 @@ console.log('LLM.java parcheado: visionBackend y audioBackend = null');
 
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 pkg.name = '@uniksolana/capacitor-llm';
-pkg.version = '8.2.1-agathia.1';
+pkg.version = '8.2.1-agathia.2';
 writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
 console.log(`package.json: ${pkg.name}@${pkg.version}`);
