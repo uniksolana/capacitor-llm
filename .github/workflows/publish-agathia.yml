@@ -6,14 +6,10 @@ on:
         description: 'Solo probar (no publica en npm)'
         type: boolean
         default: true
-  push:
-    branches:
-      - fix/agathia-safe-conversation-close
 permissions:
   contents: read
 jobs:
   publish:
-    if: github.event_name == 'workflow_dispatch' || github.event.head_commit.message == 'Release @uniksolana/capacitor-llm 8.2.1-agathia.6'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
