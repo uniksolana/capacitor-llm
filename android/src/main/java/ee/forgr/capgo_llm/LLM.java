@@ -250,6 +250,7 @@ public class LLM {
             primaryBackend,
             primaryBackend,
             request.maxTokens,
+            null,
             context.getCacheDir().getAbsolutePath()
         );
         Engine loadedEngine = new Engine(config);
@@ -500,7 +501,8 @@ public class LLM {
             defaults.getTools(),
             samplerConfig,
             defaults.getAutomaticToolCalling(),
-            defaults.getChannels()
+            defaults.getChannels(),
+            defaults.getExtraContext()
         );
         return engine.createConversation(config);
     }
