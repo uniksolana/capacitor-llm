@@ -496,7 +496,7 @@ public class LLM {
                 return;
             }
             session = chatSessions.remove(chatId);
-            if (session != null && session.conversation != null) {
+            if (session != null) {
                 closingChatIds.add(chatId);
             }
         }
@@ -558,7 +558,7 @@ public class LLM {
             if (pendingChatClosures.remove(chatId)) {
                 sessionToClose = chatSessions.remove(chatId);
                 closeCallback = pendingCloseCallbacks.remove(chatId);
-                if (sessionToClose != null && sessionToClose.conversation != null) {
+                if (sessionToClose != null) {
                     closingChatIds.add(chatId);
                 } else if (chatId.equals(activeLiteRtChatId)) {
                     activeLiteRtChatId = null;
@@ -571,7 +571,7 @@ public class LLM {
         if (sessionToClose != null) {
             enqueueChatSessionClose(chatId, sessionToClose, closeCallback, true);
         } else if (closeCallback != null) {
-            closeCallback.run();
+            lifecycleExecutor.execute(closeCallback);
         }
     }
 
