@@ -1,4 +1,4 @@
-// Parche de Agathia OS para @capgo/capacitor-llm 8.2.0
+// Parche de Agathia OS para @capgo/capacitor-llm 8.2.0 + LiteRT-LM 0.11.0
 // 1) Motor LiteRT-LM solo texto: no cargar el Vision Encoder ni el de audio (visionBackend/audioBackend = null).
 // 2) Renombrar el paquete para publicarlo bajo el scope propio.
 // Si el código original no coincide, el script falla a propósito para no publicar nada roto.
@@ -28,7 +28,7 @@ if (!versionPattern.test(plugin)) {
   console.error('ERROR: no se encontró pluginVersion en LLMPlugin.java. No se aplica ningún cambio.');
   process.exit(1);
 }
-const pluginPatched = plugin.replace(versionPattern, 'private final String pluginVersion = "8.2.1-agathia.3";');
+const pluginPatched = plugin.replace(versionPattern, 'private final String pluginVersion = "8.2.1-agathia.4";');
 if (pluginPatched === plugin) {
   console.error('ERROR: pluginVersion no cambió.');
   process.exit(1);
