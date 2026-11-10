@@ -651,6 +651,9 @@ public class LLM {
                 closeCallbacks = pendingCloseCallbacks.remove(chatId);
                 if (sessionToClose != null) {
                     closingChatIds.add(chatId);
+                    if (closeCallbacks != null && !closeCallbacks.isEmpty()) {
+                        pendingCloseCallbacks.computeIfAbsent(chatId, ignored -> new ArrayList<>()).addAll(closeCallbacks);
+                    }
                 } else {
                     completedLiteRtChatIds.remove(chatId);
                     activeLiteRtChatId = null;
@@ -661,11 +664,6 @@ public class LLM {
 
         if (sessionToClose != null) {
             enqueueChatSessionClose(chatId, sessionToClose, null, true);
-            if (closeCallbacks != null) {
-                synchronized (this) {
-                    pendingCloseCallbacks.computeIfAbsent(chatId, ignored -> new ArrayList<>()).addAll(closeCallbacks);
-                }
-            }
         } else {
             notifyCloseCallbacks(closeCallbacks, null);
         }
