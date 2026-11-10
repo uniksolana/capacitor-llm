@@ -55,6 +55,7 @@ public class LLM {
     private final Map<String, ChatSession> chatSessions;
     private final Set<String> pendingChatClosures = ConcurrentHashMap.newKeySet();
     private final Set<String> closingChatIds = ConcurrentHashMap.newKeySet();
+    private final Set<String> completedLiteRtChatIds = ConcurrentHashMap.newKeySet();
     private final Map<String, Runnable> pendingCloseCallbacks = new ConcurrentHashMap<>();
     private String activeLiteRtChatId;
 
@@ -483,11 +484,12 @@ public class LLM {
         }
 
         ChatSession session;
+        boolean releaseActiveGeneration = false;
         synchronized (this) {
-            if (chatId.equals(activeLiteRtChatId)) {
+            if (chatId.equals(activeLiteRtChatId) && !completedLiteRtChatIds.remove(chatId)) {
                 pendingChatClosures.add(chatId);
                 addCloseCallbackLocked(chatId, onClosed);
-                android.util.Log.d("LLM", "Deferring close for active LiteRT-LM chat " + chatId);
+                android.util.Log.d("LLM", "Deferring close until LiteRT-LM generation callback completes " + chatId);
                 return;
             }
             if (closingChatIds.contains(chatId)) {
@@ -495,17 +497,23 @@ public class LLM {
                 return;
             }
             session = chatSessions.remove(chatId);
+            if (chatId.equals(activeLiteRtChatId)) {
+                releaseActiveGeneration = true;
+            }
             if (session != null) {
                 closingChatIds.add(chatId);
+            } else if (releaseActiveGeneration) {
+                activeLiteRtChatId = null;
+                notifyAll();
             }
         }
 
         if (session == null) {
-            if (onClosed != null) onClosed.run();
+            runCloseCallbackSafely(onClosed);
             return;
         }
 
-        enqueueChatSessionClose(chatId, session, onClosed, false);
+        enqueueChatSessionClose(chatId, session, onClosed, releaseActiveGeneration);
     }
 
     private void enqueueChatSessionClose(
@@ -568,23 +576,30 @@ public class LLM {
         ChatSession sessionToClose = null;
         Runnable closeCallback = null;
         synchronized (this) {
+            if (!chatId.equals(activeLiteRtChatId)) {
+                return;
+            }
+
+            completedLiteRtChatIds.add(chatId);
             if (pendingChatClosures.remove(chatId)) {
                 sessionToClose = chatSessions.remove(chatId);
                 closeCallback = pendingCloseCallbacks.remove(chatId);
                 if (sessionToClose != null) {
                     closingChatIds.add(chatId);
-                } else if (chatId.equals(activeLiteRtChatId)) {
+                } else {
+                    completedLiteRtChatIds.remove(chatId);
                     activeLiteRtChatId = null;
+                    notifyAll();
                 }
-            } else if (chatId.equals(activeLiteRtChatId)) {
-                activeLiteRtChatId = null;
             }
+            // Keep activeLiteRtChatId until closeChat() requests cleanup.
+            // The native callback has not necessarily returned to LiteRT-LM yet.
         }
 
         if (sessionToClose != null) {
             enqueueChatSessionClose(chatId, sessionToClose, closeCallback, true);
         } else if (closeCallback != null) {
-            lifecycleExecutor.execute(closeCallback);
+            lifecycleExecutor.execute(() -> runCloseCallbackSafely(closeCallback));
         }
     }
 
