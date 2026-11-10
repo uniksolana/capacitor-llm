@@ -27,6 +27,7 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -50,6 +51,8 @@ public class LLM {
     private final Context context;
     private final Executor executor;
     private final Map<String, ChatSession> chatSessions;
+    private final Set<String> pendingChatClosures = ConcurrentHashMap.newKeySet();
+    private String activeLiteRtChatId;
 
     private Engine engine;
     private GenerativeModelFutures geminiNanoModel;
@@ -458,6 +461,44 @@ public class LLM {
         }
     }
 
+    /** Close one conversation. If it is generating, defer native cleanup until LiteRT-LM finishes. */
+    public void closeChat(String chatId) {
+        if (chatId == null || chatId.isBlank()) return;
+        ChatSession session;
+        synchronized (this) {
+            if (chatId.equals(activeLiteRtChatId)) {
+                pendingChatClosures.add(chatId);
+                android.util.Log.d("LLM", "Deferring close for active LiteRT-LM chat " + chatId);
+                return;
+            }
+            session = chatSessions.remove(chatId);
+        }
+        closeChatSession(chatId, session);
+    }
+
+    private void closeChatSession(String chatId, ChatSession session) {
+        if (session == null) return;
+        if (session.conversation != null) {
+            try {
+                session.conversation.close();
+            } catch (Exception exception) {
+                android.util.Log.w("LLM", "Failed to close LiteRT-LM conversation", exception);
+            }
+        }
+        if (session.backendType == BackendType.GEMINI_NANO_AGENT && geminiNanoAgentClient != null) {
+            geminiNanoAgentClient.closeSession(chatId);
+        }
+    }
+
+    private void finishLiteRtGeneration(String chatId) {
+        ChatSession sessionToClose = null;
+        synchronized (this) {
+            if (chatId.equals(activeLiteRtChatId)) activeLiteRtChatId = null;
+            if (pendingChatClosures.remove(chatId)) sessionToClose = chatSessions.remove(chatId);
+        }
+        closeChatSession(chatId, sessionToClose);
+    }
+
     public synchronized String createChat() {
         if (!isReady) {
             throw new IllegalStateException("Model not ready");
@@ -607,8 +648,14 @@ public class LLM {
         if (session.conversation == null) {
             throw new IllegalStateException("LiteRT-LM conversation not found");
         }
+        synchronized (this) {
+            if (chatSessions.get(chatId) != session) throw new IllegalStateException("Chat session is no longer active");
+            if (activeLiteRtChatId != null) throw new IllegalStateException("El motor local ya está generando otra respuesta. Espera a que termine.");
+            activeLiteRtChatId = chatId;
+        }
 
-        session.conversation.sendMessageAsync(
+        try {
+            session.conversation.sendMessageAsync(
             message,
             new com.google.ai.edge.litertlm.MessageCallback() {
                 @Override
@@ -621,16 +668,22 @@ public class LLM {
 
                 @Override
                 public void onDone() {
+                    finishLiteRtGeneration(chatId);
                     callback.onComplete(chatId);
                 }
 
                 @Override
                 public void onError(Throwable throwable) {
-                    callback.onError(throwable.getMessage());
+                    finishLiteRtGeneration(chatId);
+                    callback.onError(throwable.getMessage() == null ? "LiteRT-LM generation failed" : throwable.getMessage());
                 }
             },
             Collections.emptyMap()
-        );
+            );
+        } catch (RuntimeException exception) {
+            finishLiteRtGeneration(chatId);
+            throw exception;
+        }
     }
 
     private String extractText(Message responseMessage) {
