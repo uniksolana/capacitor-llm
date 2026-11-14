@@ -8,18 +8,17 @@ const javaPath = 'android/src/main/java/ee/forgr/capgo_llm/LLM.java';
 const java = readFileSync(javaPath, 'utf8');
 
 const pattern = /(new EngineConfig\(\s*actualPath,\s*primaryBackend,\s*)primaryBackend,(\s*)primaryBackend,/;
-if (!pattern.test(java)) {
+const alreadyPatchedPattern = /new EngineConfig\(\s*actualPath,\s*primaryBackend,\s*null,(\s*)null,/;
+if (pattern.test(java)) {
+  const patched = java.replace(pattern, (_m, start, gap) => `${start}null,${gap}null,`);
+  writeFileSync(javaPath, patched);
+  console.log('LLM.java parcheado: visionBackend y audioBackend = null');
+} else if (alreadyPatchedPattern.test(java)) {
+  console.log('LLM.java ya contiene el parche de backends de texto');
+} else {
   console.error('ERROR: no se encontró la llamada a EngineConfig esperada en LLM.java. No se aplica ningún cambio.');
   process.exit(1);
 }
-
-const patched = java.replace(pattern, (_m, start, gap) => `${start}null,${gap}null,`);
-if (patched === java) {
-  console.error('ERROR: el parche no cambió nada.');
-  process.exit(1);
-}
-writeFileSync(javaPath, patched);
-console.log('LLM.java parcheado: visionBackend y audioBackend = null');
 
 const pluginPath = 'android/src/main/java/ee/forgr/capgo_llm/LLMPlugin.java';
 const plugin = readFileSync(pluginPath, 'utf8');
