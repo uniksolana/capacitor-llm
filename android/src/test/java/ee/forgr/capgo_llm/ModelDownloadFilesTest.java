@@ -15,7 +15,7 @@ public class ModelDownloadFilesTest {
     public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
     @Test
-    public void removesOnlyStalePartialFilesForTheRequestedModel() throws Exception {
+    public void removesAgathiaStalePartialFilesAndPreservesCompletedFiles() throws Exception {
         File directory = temporaryFolder.getRoot();
         File stale = new File(directory, "agathia-gemma.litertlm.123.part");
         File unrelated = new File(directory, "agathia-other-model.456.part");
