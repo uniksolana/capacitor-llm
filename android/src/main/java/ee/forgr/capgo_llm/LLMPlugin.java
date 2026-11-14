@@ -172,7 +172,7 @@ public class LLMPlugin extends Plugin {
                         JSObject readinessData = new JSObject();
                         readinessData.put("readiness", "Failed to load model: " + error);
                         notifyListeners("readinessChange", readinessData);
-                        call.reject("Failed to load model", error);
+                        call.reject("Failed to load model: " + error, error);
                     }
                 }
             );
@@ -250,7 +250,8 @@ public class LLMPlugin extends Plugin {
                 call.resolve(ret);
             } catch (Exception e) {
                 android.util.Log.e("CapgoLLM", "Model download failed", e);
-                call.reject("Failed to download model", e);
+                String detail = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+                call.reject("Failed to download model: " + detail, e);
             }
         }, "Agathia-Model-Download").start();
     }
