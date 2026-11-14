@@ -50,7 +50,7 @@ public class ModelFileIntegrityTest {
     @Test
     public void rejectsMissingOrMalformedExpectedDigest() throws Exception {
         File file = writeModel("abc");
-        for (String invalid : new String[] { null, "", "1234", "z".repeat(64) }) {
+        for (String invalid : new String[] { null, "", "1234", "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz" }) {
             try {
                 ModelFileIntegrity.verify(file, invalid);
                 fail("Expected invalid digest rejection");
