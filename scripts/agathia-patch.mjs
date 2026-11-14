@@ -38,5 +38,14 @@ console.log('LLMPlugin.java: pluginVersion = 8.2.1-agathia.7');
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 pkg.name = '@uniksolana/capacitor-llm';
 pkg.version = '8.2.1-agathia.7';
+// npm provenance requires the package repository URL to match the GitHub
+// repository that produced the build. Keep this patch idempotent.
+pkg.repository = {
+  ...(typeof pkg.repository === 'object' && pkg.repository ? pkg.repository : {}),
+  type: 'git',
+  url: 'https://github.com/uniksolana/capacitor-llm',
+};
+pkg.homepage = 'https://github.com/uniksolana/capacitor-llm';
+pkg.bugs = { ...(typeof pkg.bugs === 'object' && pkg.bugs ? pkg.bugs : {}), url: 'https://github.com/uniksolana/capacitor-llm/issues' };
 writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
-console.log(`package.json: ${pkg.name}@${pkg.version}`);
+console.log(`package.json: ${pkg.name}@${pkg.version} (repository: ${pkg.repository.url})`);
