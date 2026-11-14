@@ -275,6 +275,12 @@ public class LLMPlugin extends Plugin {
             connection.setRequestMethod("GET");
             connection.connect();
 
+            // Do not allow an HTTPS model URL to be redirected to an insecure HTTP endpoint.
+            String effectiveProtocol = connection.getURL().getProtocol();
+            if ("https".equalsIgnoreCase(protocol) && !"https".equalsIgnoreCase(effectiveProtocol)) {
+                throw new java.io.IOException("Refusing an insecure HTTPS-to-HTTP download redirect");
+            }
+
             int statusCode = connection.getResponseCode();
             if (statusCode < 200 || statusCode >= 300) {
                 java.io.InputStream errorStream = connection.getErrorStream();
