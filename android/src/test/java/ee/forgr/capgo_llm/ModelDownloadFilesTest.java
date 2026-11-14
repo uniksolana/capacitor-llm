@@ -32,7 +32,7 @@ public class ModelDownloadFilesTest {
     }
 
     @Test
-    public void safelyIgnoresInvalidCleanupArguments() {
+    public void safelyIgnoresInvalidCleanupArguments() throws Exception {
         ModelDownloadFiles.cleanupStaleTemps(null);
     }
 }
