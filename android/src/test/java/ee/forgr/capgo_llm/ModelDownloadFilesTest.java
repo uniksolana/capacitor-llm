@@ -24,17 +24,15 @@ public class ModelDownloadFilesTest {
         Files.write(unrelated.toPath(), "keep".getBytes(StandardCharsets.UTF_8));
         Files.write(completed.toPath(), "complete".getBytes(StandardCharsets.UTF_8));
 
-        ModelDownloadFiles.cleanupStaleTemps(directory, "gemma.litertlm");
+        ModelDownloadFiles.cleanupStaleTemps(directory);
 
         assertFalse(stale.exists());
-        assertTrue(unrelated.exists());
+        assertFalse(unrelated.exists());
         assertTrue(completed.exists());
     }
 
     @Test
     public void safelyIgnoresInvalidCleanupArguments() {
-        ModelDownloadFiles.cleanupStaleTemps(null, "gemma.litertlm");
-        ModelDownloadFiles.cleanupStaleTemps(temporaryFolder.getRoot(), null);
-        ModelDownloadFiles.cleanupStaleTemps(temporaryFolder.getRoot(), "");
+        ModelDownloadFiles.cleanupStaleTemps(null);
     }
 }
