@@ -6,6 +6,15 @@ import java.io.IOException;
 final class ModelDownloadFiles {
     private ModelDownloadFiles() {}
 
+    static boolean isAllowedRedirectProtocol(String currentProtocol, String nextProtocol) {
+        boolean currentHttp = "http".equalsIgnoreCase(currentProtocol);
+        boolean currentHttps = "https".equalsIgnoreCase(currentProtocol);
+        boolean nextHttp = "http".equalsIgnoreCase(nextProtocol);
+        boolean nextHttps = "https".equalsIgnoreCase(nextProtocol);
+        if ((!currentHttp && !currentHttps) || (!nextHttp && !nextHttps)) return false;
+        return !currentHttps || nextHttps;
+    }
+
     static void cleanupStaleTemps(File parentDirectory) throws IOException {
         if (parentDirectory == null || !parentDirectory.isDirectory()) {
             return;
