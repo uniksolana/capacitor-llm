@@ -170,6 +170,9 @@ jobs:
       - name: Check plugin wiring
         run: bun run check:wiring
 
+      - name: Apply Agathia native and package patches
+        run: node scripts/agathia-patch.mjs
+
       - name: Set beta package version
         id: version
         env:
