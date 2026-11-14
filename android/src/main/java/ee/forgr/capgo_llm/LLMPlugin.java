@@ -178,84 +178,165 @@ public class LLMPlugin extends Plugin {
         String companionUrl = call.getString("companionUrl");
         String filename = call.getString("filename");
 
-        if (url == null) {
+        if (url == null || url.isBlank()) {
             call.reject("url is required");
             return;
         }
 
-        // If no filename provided, extract from URL
-        if (filename == null) {
-            String[] parts = url.split("/");
-            filename = parts[parts.length - 1];
-        }
-
-        final String finalFilename = filename;
+        final String finalUrl = url;
+        final String finalCompanionUrl = companionUrl;
+        final String requestedFilename = filename;
 
         new Thread(() -> {
             try {
-                // Download main model file
                 java.io.File filesDir = getContext().getFilesDir();
-                java.io.File modelFile = new java.io.File(filesDir, finalFilename);
+                if (filesDir == null || !filesDir.isDirectory()) {
+                    throw new java.io.IOException("Private files directory is unavailable");
+                }
 
-                downloadFile(url, modelFile, (progress) -> {
+                String resolvedFilename = requestedFilename;
+                if (resolvedFilename == null || resolvedFilename.isBlank()) {
+                    java.net.URL parsedUrl = new java.net.URL(finalUrl);
+                    String path = parsedUrl.getPath();
+                    resolvedFilename = path.substring(path.lastIndexOf('/') + 1);
+                }
+                java.io.File modelFile = resolvePrivateDownloadFile(filesDir, resolvedFilename);
+
+                downloadFile(finalUrl, modelFile, (downloadedBytes, totalBytes, percentage) -> {
                     JSObject event = new JSObject();
-                    event.put("progress", progress);
+                    event.put("progress", percentage);
+                    event.put("downloadedBytes", downloadedBytes);
+                    event.put("totalBytes", totalBytes);
                     notifyListeners("downloadProgress", event);
                 });
 
                 JSObject ret = new JSObject();
                 ret.put("path", modelFile.getAbsolutePath());
 
-                // Download companion file if provided
-                if (companionUrl != null) {
-                    String companionFilename = companionUrl.substring(companionUrl.lastIndexOf("/") + 1);
-                    java.io.File companionFile = new java.io.File(filesDir, companionFilename);
+                if (finalCompanionUrl != null && !finalCompanionUrl.isBlank()) {
+                    java.net.URL companionParsedUrl = new java.net.URL(finalCompanionUrl);
+                    String companionPath = companionParsedUrl.getPath();
+                    String companionFilename = companionPath.substring(companionPath.lastIndexOf('/') + 1);
+                    java.io.File companionFile = resolvePrivateDownloadFile(filesDir, companionFilename);
 
-                    downloadFile(companionUrl, companionFile, (progress) -> {
+                    downloadFile(finalCompanionUrl, companionFile, (downloadedBytes, totalBytes, percentage) -> {
                         JSObject event = new JSObject();
-                        event.put("progress", progress);
+                        event.put("progress", percentage);
+                        event.put("downloadedBytes", downloadedBytes);
+                        event.put("totalBytes", totalBytes);
                         notifyListeners("downloadProgress", event);
                     });
-
                     ret.put("companionPath", companionFile.getAbsolutePath());
                 }
 
                 call.resolve(ret);
             } catch (Exception e) {
-                call.reject("Failed to download model", e.getMessage());
+                android.util.Log.e("CapgoLLM", "Model download failed", e);
+                call.reject("Failed to download model", e);
             }
-        })
-            .start();
+        }, "Agathia-Model-Download").start();
+    }
+
+    private java.io.File resolvePrivateDownloadFile(java.io.File filesDir, String requestedName) throws java.io.IOException {
+        if (requestedName == null) {
+            throw new java.io.IOException("Download filename is missing");
+        }
+
+        String safeName = requestedName.replace('\\\\', '/');
+        safeName = safeName.substring(safeName.lastIndexOf('/') + 1);
+        safeName = safeName.replaceAll("[^A-Za-z0-9._-]", "_");
+        if (safeName.isBlank() || ".".equals(safeName) || "..".equals(safeName)) {
+            throw new java.io.IOException("Download filename is invalid");
+        }
+
+        java.io.File base = filesDir.getCanonicalFile();
+        java.io.File destination = new java.io.File(base, safeName).getCanonicalFile();
+        if (!base.equals(destination.getParentFile())) {
+            throw new java.io.IOException("Download destination is outside private storage");
+        }
+        return destination;
     }
 
     private void downloadFile(String urlString, java.io.File outputFile, ProgressCallback callback) throws Exception {
         java.net.URL url = new java.net.URL(urlString);
-        java.net.HttpURLConnection connection = (java.net.HttpURLConnection) url.openConnection();
-        connection.connect();
-
-        int fileLength = connection.getContentLength();
-        java.io.InputStream input = new java.io.BufferedInputStream(connection.getInputStream());
-        java.io.FileOutputStream output = new java.io.FileOutputStream(outputFile);
-
-        byte[] data = new byte[4096];
-        long total = 0;
-        int count;
-
-        while ((count = input.read(data)) != -1) {
-            total += count;
-            if (fileLength > 0 && callback != null) {
-                callback.onProgress((int) ((total * 100) / fileLength));
-            }
-            output.write(data, 0, count);
+        String protocol = url.getProtocol();
+        if (!"https".equalsIgnoreCase(protocol) && !"http".equalsIgnoreCase(protocol)) {
+            throw new java.io.IOException("Only HTTP and HTTPS download URLs are supported");
         }
 
-        output.flush();
-        output.close();
-        input.close();
+        java.net.HttpURLConnection connection = null;
+        java.io.File temporaryFile = null;
+        try {
+            connection = (java.net.HttpURLConnection) url.openConnection();
+            connection.setConnectTimeout(20_000);
+            connection.setReadTimeout(90_000);
+            connection.setInstanceFollowRedirects(true);
+            connection.setUseCaches(false);
+            connection.setRequestMethod("GET");
+            connection.connect();
+
+            int statusCode = connection.getResponseCode();
+            if (statusCode < 200 || statusCode >= 300) {
+                java.io.InputStream errorStream = connection.getErrorStream();
+                if (errorStream != null) {
+                    try {
+                        errorStream.close();
+                    } catch (java.io.IOException ignored) {
+                        android.util.Log.w("CapgoLLM", "Could not close HTTP error stream", ignored);
+                    }
+                }
+                throw new java.io.IOException("Model server returned HTTP " + statusCode);
+            }
+
+            long expectedLength = connection.getContentLengthLong();
+            java.io.File parent = outputFile.getParentFile();
+            if (parent == null || !parent.isDirectory()) {
+                throw new java.io.IOException("Download destination directory is unavailable");
+            }
+            temporaryFile = java.io.File.createTempFile(outputFile.getName() + ".", ".part", parent);
+
+            long totalBytes = 0L;
+            byte[] buffer = new byte[64 * 1024];
+            try (
+                java.io.InputStream input = new java.io.BufferedInputStream(connection.getInputStream());
+                java.io.FileOutputStream output = new java.io.FileOutputStream(temporaryFile)
+            ) {
+                int count;
+                while ((count = input.read(buffer)) != -1) {
+                    output.write(buffer, 0, count);
+                    totalBytes += (long) count;
+                    if (callback != null) {
+                        int percentage = expectedLength > 0L
+                            ? (int) Math.min(100L, (long) ((double) totalBytes * 100.0d / (double) expectedLength))
+                            : -1;
+                        callback.onProgress(totalBytes, expectedLength, percentage);
+                    }
+                }
+                output.flush();
+                output.getFD().sync();
+            }
+
+            if (expectedLength >= 0L && totalBytes != expectedLength) {
+                throw new java.io.IOException(
+                    "Incomplete download: received " + totalBytes + " of " + expectedLength + " bytes"
+                );
+            }
+
+            // Same-directory rename is atomic on Android/Linux and preserves the previous file on failure.
+            android.system.Os.rename(temporaryFile.getAbsolutePath(), outputFile.getAbsolutePath());
+            temporaryFile = null;
+        } finally {
+            if (temporaryFile != null && temporaryFile.exists() && !temporaryFile.delete()) {
+                android.util.Log.w("CapgoLLM", "Could not remove partial download: " + temporaryFile.getAbsolutePath());
+            }
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
     }
 
     interface ProgressCallback {
-        void onProgress(int percentage);
+        void onProgress(long downloadedBytes, long totalBytes, int percentage);
     }
 
     @PluginMethod
