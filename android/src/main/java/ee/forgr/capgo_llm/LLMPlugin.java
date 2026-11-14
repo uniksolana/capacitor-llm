@@ -332,6 +332,9 @@ public class LLMPlugin extends Plugin {
                     throw new java.io.IOException("Refusing an insecure HTTPS-to-HTTP download redirect");
                 }
                 url = redirectedUrl;
+                // Enforce the downgrade rule at every hop, not only against the
+                // original URL (HTTP -> HTTPS -> HTTP must also be rejected).
+                protocol = redirectedProtocol;
             }
 
             if (statusCode < 200 || statusCode >= 300) {
