@@ -121,10 +121,19 @@ public class LLMPlugin extends Plugin {
     @PluginMethod
     public void setModel(PluginCall call) {
         String path = call.getString("path");
+        String expectedSha256 = call.getString("expectedSha256");
 
         if (path == null) {
             call.reject("path is required");
             return;
+        }
+        if (expectedSha256 != null) {
+            try {
+                ModelFileIntegrity.parseExpectedSha256(expectedSha256);
+            } catch (IllegalArgumentException exception) {
+                call.reject(exception.getMessage(), exception);
+                return;
+            }
         }
 
         // Extract model parameters
@@ -139,6 +148,7 @@ public class LLMPlugin extends Plugin {
         try {
             llm.setModel(
                 path,
+                expectedSha256,
                 modelType,
                 maxTokens,
                 topk,
@@ -177,9 +187,17 @@ public class LLMPlugin extends Plugin {
         String url = call.getString("url");
         String companionUrl = call.getString("companionUrl");
         String filename = call.getString("filename");
+        String expectedSha256 = call.getString("expectedSha256");
 
         if (url == null || url.isBlank()) {
             call.reject("url is required");
+            return;
+        }
+        final byte[] expectedDigest;
+        try {
+            expectedDigest = expectedSha256 == null ? null : ModelFileIntegrity.parseExpectedSha256(expectedSha256);
+        } catch (IllegalArgumentException exception) {
+            call.reject(exception.getMessage(), exception);
             return;
         }
 
@@ -202,7 +220,7 @@ public class LLMPlugin extends Plugin {
                 }
                 java.io.File modelFile = resolvePrivateDownloadFile(filesDir, resolvedFilename);
 
-                downloadFile(finalUrl, modelFile, (downloadedBytes, totalBytes, percentage) -> {
+                downloadFile(finalUrl, modelFile, expectedDigest, (downloadedBytes, totalBytes, percentage) -> {
                     JSObject event = new JSObject();
                     event.put("progress", percentage);
                     event.put("downloadedBytes", downloadedBytes);
@@ -219,7 +237,7 @@ public class LLMPlugin extends Plugin {
                     String companionFilename = companionPath.substring(companionPath.lastIndexOf('/') + 1);
                     java.io.File companionFile = resolvePrivateDownloadFile(filesDir, companionFilename);
 
-                    downloadFile(finalCompanionUrl, companionFile, (downloadedBytes, totalBytes, percentage) -> {
+                    downloadFile(finalCompanionUrl, companionFile, null, (downloadedBytes, totalBytes, percentage) -> {
                         JSObject event = new JSObject();
                         event.put("progress", percentage);
                         event.put("downloadedBytes", downloadedBytes);
@@ -257,7 +275,7 @@ public class LLMPlugin extends Plugin {
         return destination;
     }
 
-    private void downloadFile(String urlString, java.io.File outputFile, ProgressCallback callback) throws Exception {
+    private void downloadFile(String urlString, java.io.File outputFile, byte[] expectedDigest, ProgressCallback callback) throws Exception {
         java.net.URL url = new java.net.URL(urlString);
         String protocol = url.getProtocol();
         if (!"https".equalsIgnoreCase(protocol) && !"http".equalsIgnoreCase(protocol)) {
@@ -326,6 +344,7 @@ public class LLMPlugin extends Plugin {
             temporaryFile = java.io.File.createTempFile("agathia-" + outputFile.getName() + ".", ".part", parent);
 
             long totalBytes = 0L;
+            java.security.MessageDigest digest = expectedDigest == null ? null : ModelFileIntegrity.newSha256Digest();
             byte[] buffer = new byte[64 * 1024];
             try (
                 java.io.InputStream input = new java.io.BufferedInputStream(connection.getInputStream());
@@ -334,6 +353,7 @@ public class LLMPlugin extends Plugin {
                 int count;
                 while ((count = input.read(buffer)) != -1) {
                     output.write(buffer, 0, count);
+                    if (digest != null) digest.update(buffer, 0, count);
                     totalBytes += (long) count;
                     if (callback != null) {
                         int percentage = expectedLength > 0L
@@ -350,6 +370,10 @@ public class LLMPlugin extends Plugin {
                 throw new java.io.IOException(
                     "Incomplete download: received " + totalBytes + " of " + expectedLength + " bytes"
                 );
+            }
+
+            if (digest != null && !ModelFileIntegrity.matches(digest.digest(), expectedDigest)) {
+                throw new java.io.IOException("MODEL_CHECKSUM_MISMATCH: downloaded model SHA-256 does not match the pinned artifact");
             }
 
             // Same-directory rename is atomic on Android/Linux and preserves the previous file on failure.
