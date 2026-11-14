@@ -283,7 +283,7 @@ public class LLMPlugin extends Plugin {
         }
         // A process killed during a multi-GB transfer can leave a .part file.
         // Remove only stale temporaries for this destination before starting.
-        ModelDownloadFiles.cleanupStaleTemps(parent, outputFile.getName());
+        ModelDownloadFiles.cleanupStaleTemps(parent);
 
         java.net.URL url = new java.net.URL(urlString);
         String protocol = url.getProtocol();
