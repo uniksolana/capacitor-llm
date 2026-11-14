@@ -1,4 +1,4 @@
-// Parche de Agathia OS para @capgo/capacitor-llm 8.2.1-agathia.6 + LiteRT-LM 0.11.0
+// Parche de Agathia OS para @capgo/capacitor-llm 8.2.1-agathia.7 + LiteRT-LM 0.11.0
 // 1) Motor LiteRT-LM solo texto: no cargar el Vision Encoder ni el de audio (visionBackend/audioBackend = null).
 // 2) Renombrar el paquete para publicarlo bajo el scope propio.
 // Si el código original no coincide, el script falla a propósito para no publicar nada roto.
@@ -29,16 +29,16 @@ if (!versionPattern.test(plugin)) {
   process.exit(1);
 }
 if (!plugin.includes("public void closeChat(PluginCall call)")) { console.error("ERROR: falta closeChat en LLMPlugin.java."); process.exit(1); }
-const pluginPatched = plugin.replace(versionPattern, 'private final String pluginVersion = "8.2.1-agathia.6";');
+const pluginPatched = plugin.replace(versionPattern, 'private final String pluginVersion = "8.2.1-agathia.7";');
 if (pluginPatched === plugin) {
   console.error('ERROR: pluginVersion no cambió.');
   process.exit(1);
 }
 writeFileSync(pluginPath, pluginPatched);
-console.log('LLMPlugin.java: pluginVersion = 8.2.1-agathia.6');
+console.log('LLMPlugin.java: pluginVersion = 8.2.1-agathia.7');
 
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 pkg.name = '@uniksolana/capacitor-llm';
-pkg.version = '8.2.1-agathia.6';
+pkg.version = '8.2.1-agathia.7';
 writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
 console.log(`package.json: ${pkg.name}@${pkg.version}`);
