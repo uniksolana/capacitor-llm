@@ -325,11 +325,11 @@ public class LLMPlugin extends Plugin {
 
                 java.net.URL redirectedUrl = new java.net.URL(url, location);
                 String redirectedProtocol = redirectedUrl.getProtocol();
-                if (!"https".equalsIgnoreCase(redirectedProtocol) && !"http".equalsIgnoreCase(redirectedProtocol)) {
+                if (!ModelDownloadFiles.isAllowedRedirectProtocol(protocol, redirectedProtocol)) {
+                    if ("https".equalsIgnoreCase(protocol) && !"https".equalsIgnoreCase(redirectedProtocol)) {
+                        throw new java.io.IOException("Refusing an insecure HTTPS-to-HTTP download redirect");
+                    }
                     throw new java.io.IOException("Model download redirect used an unsupported protocol");
-                }
-                if ("https".equalsIgnoreCase(protocol) && !"https".equalsIgnoreCase(redirectedProtocol)) {
-                    throw new java.io.IOException("Refusing an insecure HTTPS-to-HTTP download redirect");
                 }
                 url = redirectedUrl;
                 // Enforce the downgrade rule at every hop, not only against the
