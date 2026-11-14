@@ -32,6 +32,16 @@ public class ModelDownloadFilesTest {
     }
 
     @Test
+    public void allowsOnlySafeHttpAndHttpsRedirectTransitions() {
+        assertTrue(ModelDownloadFiles.isAllowedRedirectProtocol("http", "http"));
+        assertTrue(ModelDownloadFiles.isAllowedRedirectProtocol("http", "https"));
+        assertTrue(ModelDownloadFiles.isAllowedRedirectProtocol("https", "https"));
+        assertFalse(ModelDownloadFiles.isAllowedRedirectProtocol("https", "http"));
+        assertFalse(ModelDownloadFiles.isAllowedRedirectProtocol("https", "file"));
+        assertFalse(ModelDownloadFiles.isAllowedRedirectProtocol("ftp", "https"));
+    }
+
+    @Test
     public void safelyIgnoresInvalidCleanupArguments() throws Exception {
         ModelDownloadFiles.cleanupStaleTemps(null);
     }
