@@ -215,6 +215,26 @@ export class CapgoLLMWeb extends WebPlugin implements LLMPlugin {
         } as DownloadProgressEvent);
       }
 
+      if (options.expectedSha256) {
+        if (!/^[a-f0-9]{64}$/i.test(options.expectedSha256)) {
+          throw new Error('MODEL_CHECKSUM_UNAVAILABLE: expected SHA-256 must contain exactly 64 hexadecimal characters');
+        }
+        if (!globalThis.crypto?.subtle) {
+          throw new Error('MODEL_CHECKSUM_UNAVAILABLE: Web Crypto SHA-256 is not available in this context');
+        }
+        const downloaded = new Uint8Array(downloadedBytes);
+        let offset = 0;
+        for (const chunk of chunks) {
+          downloaded.set(chunk, offset);
+          offset += chunk.length;
+        }
+        const digest = new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256', downloaded));
+        const actualSha256 = Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('');
+        if (actualSha256 !== options.expectedSha256.toLowerCase()) {
+          throw new Error('MODEL_CHECKSUM_MISMATCH: downloaded model SHA-256 does not match the expected artifact');
+        }
+      }
+
       // For web, we'll return the original URL as the path
       // In a real implementation, you might want to store this in IndexedDB
       const result: DownloadModelResult = {
