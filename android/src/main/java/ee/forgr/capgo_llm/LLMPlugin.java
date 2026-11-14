@@ -9,7 +9,7 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 @CapacitorPlugin(name = "CapgoLLM")
 public class LLMPlugin extends Plugin {
 
-    private final String pluginVersion = "8.2.0";
+    private final String pluginVersion = "8.2.1-agathia.7";
 
     private LLM llm;
 
@@ -293,7 +293,7 @@ public class LLMPlugin extends Plugin {
             if (parent == null || !parent.isDirectory()) {
                 throw new java.io.IOException("Download destination directory is unavailable");
             }
-            temporaryFile = java.io.File.createTempFile(outputFile.getName() + ".", ".part", parent);
+            temporaryFile = java.io.File.createTempFile("agathia-" + outputFile.getName() + ".", ".part", parent);
 
             long totalBytes = 0L;
             byte[] buffer = new byte[64 * 1024];
