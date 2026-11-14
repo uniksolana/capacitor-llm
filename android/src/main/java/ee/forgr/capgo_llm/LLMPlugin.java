@@ -281,8 +281,9 @@ public class LLMPlugin extends Plugin {
         if (parent == null || !parent.isDirectory()) {
             throw new java.io.IOException("Download destination directory is unavailable");
         }
-        // A process killed during a multi-GB transfer can leave a .part file.
-        // Remove only stale temporaries for this destination before starting.
+        // A process killed during a multi-GB transfer can leave model or
+        // companion .part files. This method is synchronized, so all old
+        // Agathia temporaries can be removed safely before the next download.
         ModelDownloadFiles.cleanupStaleTemps(parent);
 
         java.net.URL url = new java.net.URL(urlString);
