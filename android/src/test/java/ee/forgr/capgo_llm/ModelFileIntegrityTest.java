@@ -37,6 +37,17 @@ public class ModelFileIntegrityTest {
     }
 
     @Test
+    public void rejectsTruncatedFile() throws Exception {
+        File file = writeModel("ab");
+        try {
+            ModelFileIntegrity.verify(file, SHA256_ABC);
+            fail("Expected truncated file rejection");
+        } catch (IOException exception) {
+            assertTrue(exception.getMessage().contains("MODEL_CHECKSUM_MISMATCH"));
+        }
+    }
+
+    @Test
     public void rejectsMissingOrMalformedExpectedDigest() throws Exception {
         File file = writeModel("abc");
         for (String invalid : new String[] { null, "", "1234", "z".repeat(64) }) {
