@@ -5,19 +5,17 @@ import java.io.File;
 final class ModelDownloadFiles {
     private ModelDownloadFiles() {}
 
-    static void cleanupStaleTemps(File parentDirectory, String targetFilename) {
-        if (parentDirectory == null || !parentDirectory.isDirectory()
-            || targetFilename == null || targetFilename.isBlank()) {
+    static void cleanupStaleTemps(File parentDirectory) {
+        if (parentDirectory == null || !parentDirectory.isDirectory()) {
             return;
         }
 
         File[] entries = parentDirectory.listFiles();
         if (entries == null) return;
 
-        String prefix = "agathia-" + targetFilename + ".";
         for (File entry : entries) {
             String name = entry.getName();
-            if (!entry.isFile() || !name.startsWith(prefix) || !name.endsWith(".part")) {
+            if (!entry.isFile() || !name.startsWith("agathia-") || !name.endsWith(".part")) {
                 continue;
             }
             if (!entry.delete()) {
