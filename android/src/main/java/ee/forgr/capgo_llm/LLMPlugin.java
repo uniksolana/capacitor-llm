@@ -242,7 +242,7 @@ public class LLMPlugin extends Plugin {
             throw new java.io.IOException("Download filename is missing");
         }
 
-        String safeName = requestedName.replace('\\\\', '/');
+        String safeName = requestedName.replace('\\', '/');
         safeName = safeName.substring(safeName.lastIndexOf('/') + 1);
         safeName = safeName.replaceAll("[^A-Za-z0-9._-]", "_");
         if (safeName.isBlank() || ".".equals(safeName) || "..".equals(safeName)) {
