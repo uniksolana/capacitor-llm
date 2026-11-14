@@ -4,6 +4,10 @@ on:
     branches:
       - fix/agathia-safe-conversation-close
       - fix/agathia-safe-download-io
+  pull_request:
+    branches:
+      - fix/agathia-safe-conversation-close
+      - main
 permissions:
   contents: read
 jobs:
