@@ -215,11 +215,16 @@ jobs:
           npm stage publish --tag beta --provenance --access public --ignore-scripts
 
 
-      - name: Request stage approval
+      - name: Request optional stage automation
         continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.NPM_STAGE_DISPATCH_TOKEN }}
         run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "NPM_STAGE_DISPATCH_TOKEN is not configured."
+            echo "The package remains staged and requires a maintainer to approve it in npmjs.com with 2FA."
+            exit 0
+          fi
           gh api --method POST repos/Cap-go/automations/dispatches \
             -f event_type=npm-stage-approve \
             -f "client_payload[repository]=${GITHUB_REPOSITORY}" \
@@ -241,13 +246,14 @@ jobs:
               '',
               '## Beta npm build',
               '',
-              'Status: staged',
+              'Status: staged — awaiting maintainer approval with npm 2FA',
               '',
               `Version: \`${version}\``,
               `Source: \`${shortSha}\``,
               `Requested by @${actor}`,
               '',
-              'Latest beta:',
+              'This version is not installable until a package maintainer approves it in npmjs.com → Staged Packages.',
+              'After approval, install with:',
               '```sh',
               `bun add ${packageName}@beta`,
               `bun add ${packageName}@${version}`,
