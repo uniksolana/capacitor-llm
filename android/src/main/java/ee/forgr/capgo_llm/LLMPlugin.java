@@ -276,7 +276,15 @@ public class LLMPlugin extends Plugin {
         return destination;
     }
 
-    private void downloadFile(String urlString, java.io.File outputFile, byte[] expectedDigest, ProgressCallback callback) throws Exception {
+    private synchronized void downloadFile(String urlString, java.io.File outputFile, byte[] expectedDigest, ProgressCallback callback) throws Exception {
+        java.io.File parent = outputFile.getParentFile();
+        if (parent == null || !parent.isDirectory()) {
+            throw new java.io.IOException("Download destination directory is unavailable");
+        }
+        // A process killed during a multi-GB transfer can leave a .part file.
+        // Remove only stale temporaries for this destination before starting.
+        ModelDownloadFiles.cleanupStaleTemps(parent, outputFile.getName());
+
         java.net.URL url = new java.net.URL(urlString);
         String protocol = url.getProtocol();
         if (!"https".equalsIgnoreCase(protocol) && !"http".equalsIgnoreCase(protocol)) {
@@ -338,10 +346,6 @@ public class LLMPlugin extends Plugin {
             }
 
             long expectedLength = connection.getContentLengthLong();
-            java.io.File parent = outputFile.getParentFile();
-            if (parent == null || !parent.isDirectory()) {
-                throw new java.io.IOException("Download destination directory is unavailable");
-            }
             temporaryFile = java.io.File.createTempFile("agathia-" + outputFile.getName() + ".", ".part", parent);
 
             long totalBytes = 0L;
