@@ -1,4 +1,4 @@
-// Parche de Agathia OS para @capgo/capacitor-llm 8.2.1-agathia.6 + LiteRT-LM 0.11.0
+// Parche de Agathia OS para @capgo/capacitor-llm 8.2.1-agathia.7 + LiteRT-LM 0.11.0
 // 1) Motor LiteRT-LM solo texto: no cargar el Vision Encoder ni el de audio (visionBackend/audioBackend = null).
 // 2) Renombrar el paquete para publicarlo bajo el scope propio.
 // Si el código original no coincide, el script falla a propósito para no publicar nada roto.
@@ -8,18 +8,17 @@ const javaPath = 'android/src/main/java/ee/forgr/capgo_llm/LLM.java';
 const java = readFileSync(javaPath, 'utf8');
 
 const pattern = /(new EngineConfig\(\s*actualPath,\s*primaryBackend,\s*)primaryBackend,(\s*)primaryBackend,/;
-if (!pattern.test(java)) {
+const alreadyPatchedPattern = /new EngineConfig\(\s*actualPath,\s*primaryBackend,\s*null,(\s*)null,/;
+if (pattern.test(java)) {
+  const patched = java.replace(pattern, (_m, start, gap) => `${start}null,${gap}null,`);
+  writeFileSync(javaPath, patched);
+  console.log('LLM.java parcheado: visionBackend y audioBackend = null');
+} else if (alreadyPatchedPattern.test(java)) {
+  console.log('LLM.java ya contiene el parche de backends de texto');
+} else {
   console.error('ERROR: no se encontró la llamada a EngineConfig esperada en LLM.java. No se aplica ningún cambio.');
   process.exit(1);
 }
-
-const patched = java.replace(pattern, (_m, start, gap) => `${start}null,${gap}null,`);
-if (patched === java) {
-  console.error('ERROR: el parche no cambió nada.');
-  process.exit(1);
-}
-writeFileSync(javaPath, patched);
-console.log('LLM.java parcheado: visionBackend y audioBackend = null');
 
 const pluginPath = 'android/src/main/java/ee/forgr/capgo_llm/LLMPlugin.java';
 const plugin = readFileSync(pluginPath, 'utf8');
@@ -29,16 +28,24 @@ if (!versionPattern.test(plugin)) {
   process.exit(1);
 }
 if (!plugin.includes("public void closeChat(PluginCall call)")) { console.error("ERROR: falta closeChat en LLMPlugin.java."); process.exit(1); }
-const pluginPatched = plugin.replace(versionPattern, 'private final String pluginVersion = "8.2.1-agathia.6";');
-if (pluginPatched === plugin) {
-  console.error('ERROR: pluginVersion no cambió.');
-  process.exit(1);
+const expectedPluginVersion = 'private final String pluginVersion = "8.2.1-agathia.7";';
+const pluginPatched = plugin.replace(versionPattern, expectedPluginVersion);
+if (pluginPatched !== plugin) {
+  writeFileSync(pluginPath, pluginPatched);
 }
-writeFileSync(pluginPath, pluginPatched);
-console.log('LLMPlugin.java: pluginVersion = 8.2.1-agathia.6');
+console.log('LLMPlugin.java: pluginVersion = 8.2.1-agathia.7');
 
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 pkg.name = '@uniksolana/capacitor-llm';
-pkg.version = '8.2.1-agathia.6';
+pkg.version = '8.2.1-agathia.7';
+// npm provenance requires the package repository URL to match the GitHub
+// repository that produced the build. Keep this patch idempotent.
+pkg.repository = {
+  ...(typeof pkg.repository === 'object' && pkg.repository ? pkg.repository : {}),
+  type: 'git',
+  url: 'https://github.com/uniksolana/capacitor-llm',
+};
+pkg.homepage = 'https://github.com/uniksolana/capacitor-llm';
+pkg.bugs = { ...(typeof pkg.bugs === 'object' && pkg.bugs ? pkg.bugs : {}), url: 'https://github.com/uniksolana/capacitor-llm/issues' };
 writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
-console.log(`package.json: ${pkg.name}@${pkg.version}`);
+console.log(`package.json: ${pkg.name}@${pkg.version} (repository: ${pkg.repository.url})`);
