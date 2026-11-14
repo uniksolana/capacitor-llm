@@ -267,21 +267,45 @@ public class LLMPlugin extends Plugin {
         java.net.HttpURLConnection connection = null;
         java.io.File temporaryFile = null;
         try {
-            connection = (java.net.HttpURLConnection) url.openConnection();
-            connection.setConnectTimeout(20_000);
-            connection.setReadTimeout(90_000);
-            connection.setInstanceFollowRedirects(true);
-            connection.setUseCaches(false);
-            connection.setRequestMethod("GET");
-            connection.connect();
+            int statusCode;
+            int redirectCount = 0;
+            while (true) {
+                connection = (java.net.HttpURLConnection) url.openConnection();
+                connection.setConnectTimeout(20_000);
+                connection.setReadTimeout(90_000);
+                connection.setInstanceFollowRedirects(false);
+                connection.setUseCaches(false);
+                connection.setRequestMethod("GET");
+                connection.connect();
+                statusCode = connection.getResponseCode();
 
-            // Do not allow an HTTPS model URL to be redirected to an insecure HTTP endpoint.
-            String effectiveProtocol = connection.getURL().getProtocol();
-            if ("https".equalsIgnoreCase(protocol) && !"https".equalsIgnoreCase(effectiveProtocol)) {
-                throw new java.io.IOException("Refusing an insecure HTTPS-to-HTTP download redirect");
+                boolean redirect = statusCode == java.net.HttpURLConnection.HTTP_MOVED_PERM
+                    || statusCode == java.net.HttpURLConnection.HTTP_MOVED_TEMP
+                    || statusCode == java.net.HttpURLConnection.HTTP_SEE_OTHER
+                    || statusCode == 307 || statusCode == 308;
+                if (!redirect) break;
+
+                String location = connection.getHeaderField("Location");
+                connection.disconnect();
+                connection = null;
+                if (location == null || location.trim().isEmpty()) {
+                    throw new java.io.IOException("Model server returned a redirect without a Location header");
+                }
+                if (++redirectCount > 5) {
+                    throw new java.io.IOException("Model download exceeded the maximum of 5 redirects");
+                }
+
+                java.net.URL redirectedUrl = new java.net.URL(url, location);
+                String redirectedProtocol = redirectedUrl.getProtocol();
+                if (!"https".equalsIgnoreCase(redirectedProtocol) && !"http".equalsIgnoreCase(redirectedProtocol)) {
+                    throw new java.io.IOException("Model download redirect used an unsupported protocol");
+                }
+                if ("https".equalsIgnoreCase(protocol) && !"https".equalsIgnoreCase(redirectedProtocol)) {
+                    throw new java.io.IOException("Refusing an insecure HTTPS-to-HTTP download redirect");
+                }
+                url = redirectedUrl;
             }
 
-            int statusCode = connection.getResponseCode();
             if (statusCode < 200 || statusCode >= 300) {
                 java.io.InputStream errorStream = connection.getErrorStream();
                 if (errorStream != null) {
