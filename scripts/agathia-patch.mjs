@@ -28,16 +28,16 @@ if (!versionPattern.test(plugin)) {
   process.exit(1);
 }
 if (!plugin.includes("public void closeChat(PluginCall call)")) { console.error("ERROR: falta closeChat en LLMPlugin.java."); process.exit(1); }
-const expectedPluginVersion = 'private final String pluginVersion = "8.2.1-agathia.7";';
+const expectedPluginVersion = 'private final String pluginVersion = "8.2.1-agathia.8";';
 const pluginPatched = plugin.replace(versionPattern, expectedPluginVersion);
 if (pluginPatched !== plugin) {
   writeFileSync(pluginPath, pluginPatched);
 }
-console.log('LLMPlugin.java: pluginVersion = 8.2.1-agathia.7');
+console.log('LLMPlugin.java: pluginVersion = 8.2.1-agathia.8');
 
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 pkg.name = '@uniksolana/capacitor-llm';
-pkg.version = '8.2.1-agathia.7';
+pkg.version = '8.2.1-agathia.8';
 // npm provenance requires the package repository URL to match the GitHub
 // repository that produced the build. Keep this patch idempotent.
 pkg.repository = {
