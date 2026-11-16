@@ -43,7 +43,7 @@ public class ModelDownloadFilesTest {
 
     @Test
     public void enforcesDownloadByteLimitWithoutOverflow() {
-        assertTrue(ModelDownloadFiles.isWithinDownloadLimit(0L, 64 * 1024, 1024L));
+        assertTrue(ModelDownloadFiles.isWithinDownloadLimit(0L, 64 * 1024, 128L * 1024L));
         assertTrue(ModelDownloadFiles.isWithinDownloadLimit(900L, 124, 1024L));
         assertFalse(ModelDownloadFiles.isWithinDownloadLimit(900L, 125, 1024L));
         assertFalse(ModelDownloadFiles.isWithinDownloadLimit(Long.MAX_VALUE, 1, Long.MAX_VALUE));
