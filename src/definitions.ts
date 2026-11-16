@@ -156,6 +156,8 @@ export interface DownloadModelOptions {
   url: string;
   /** Optional expected SHA-256 hex digest. Android verifies it while streaming before atomically replacing the destination. */
   expectedSha256?: string;
+  /** Optional maximum download size in bytes. Android enforces it against Content-Length and every streamed chunk. Defaults to 4 GiB for models; companion files are capped at 512 MiB. */
+  maxBytes?: number;
   /** Optional: URL of a companion file for legacy model formats */
   companionUrl?: string;
   /** Optional: Custom filename (defaults to filename from URL) */
