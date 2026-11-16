@@ -93,6 +93,7 @@ public class LLM {
 
     public synchronized void setModel(
         String path,
+        String expectedSha256,
         String modelType,
         Integer maxTokens,
         Integer topk,
@@ -115,7 +116,8 @@ public class LLM {
             temperature,
             randomSeed,
             backend,
-            androidGeminiBackend
+            androidGeminiBackend,
+            expectedSha256
         );
         try {
             resetModelState();
@@ -148,7 +150,8 @@ public class LLM {
         Float temperature,
         Integer randomSeed,
         String backend,
-        String androidGeminiBackend
+        String androidGeminiBackend,
+        String expectedSha256
     ) {
         return new ModelLoadRequest(
             path,
@@ -159,6 +162,7 @@ public class LLM {
             randomSeed,
             backend,
             androidGeminiBackend,
+            expectedSha256,
             loadSequence.nextLoadId()
         );
     }
@@ -190,6 +194,9 @@ public class LLM {
                 android.util.Log.d("LLM", "Resolved model path: " + actualPath + " using backend: " + backend);
 
                 if (backend == BackendType.LITERT) {
+                    if (request.expectedSha256 != null) {
+                        ModelFileIntegrity.verify(new File(actualPath), request.expectedSha256);
+                    }
                     Engine loadedEngine = initializeLiteRtModel(actualPath, request);
                     if (!isCurrentLoad(request.loadId)) {
                         closeEngine(loadedEngine);
@@ -1197,6 +1204,7 @@ public class LLM {
         private final Integer randomSeed;
         private final String backend;
         private final String androidGeminiBackend;
+        private final String expectedSha256;
         private final long loadId;
 
         private ModelLoadRequest(
@@ -1208,6 +1216,7 @@ public class LLM {
             Integer randomSeed,
             String backend,
             String androidGeminiBackend,
+            String expectedSha256,
             long loadId
         ) {
             this.modelPath = modelPath;
@@ -1218,6 +1227,7 @@ public class LLM {
             this.randomSeed = randomSeed;
             this.backend = backend;
             this.androidGeminiBackend = androidGeminiBackend;
+            this.expectedSha256 = expectedSha256;
             this.loadId = loadId;
         }
     }
