@@ -188,6 +188,11 @@ public class LLMPlugin extends Plugin {
         String companionUrl = call.getString("companionUrl");
         String filename = call.getString("filename");
         String expectedSha256 = call.getString("expectedSha256");
+        long maxModelBytes = call.getData().optLong("maxBytes", ModelDownloadFiles.DEFAULT_MAX_MODEL_BYTES);
+        if (maxModelBytes <= 0L || maxModelBytes > ModelDownloadFiles.ABSOLUTE_MAX_MODEL_BYTES) {
+            call.reject("maxBytes must be between 1 and " + ModelDownloadFiles.ABSOLUTE_MAX_MODEL_BYTES);
+            return;
+        }
 
         if (url == null || url.isBlank()) {
             call.reject("url is required");
@@ -220,7 +225,7 @@ public class LLMPlugin extends Plugin {
                 }
                 java.io.File modelFile = resolvePrivateDownloadFile(filesDir, resolvedFilename);
 
-                downloadFile(finalUrl, modelFile, expectedDigest, (downloadedBytes, totalBytes, percentage) -> {
+                downloadFile(finalUrl, modelFile, expectedDigest, maxModelBytes, (downloadedBytes, totalBytes, percentage) -> {
                     JSObject event = new JSObject();
                     event.put("progress", percentage);
                     event.put("downloadedBytes", downloadedBytes);
@@ -237,7 +242,7 @@ public class LLMPlugin extends Plugin {
                     String companionFilename = companionPath.substring(companionPath.lastIndexOf('/') + 1);
                     java.io.File companionFile = resolvePrivateDownloadFile(filesDir, companionFilename);
 
-                    downloadFile(finalCompanionUrl, companionFile, null, (downloadedBytes, totalBytes, percentage) -> {
+                    downloadFile(finalCompanionUrl, companionFile, null, ModelDownloadFiles.MAX_COMPANION_BYTES, (downloadedBytes, totalBytes, percentage) -> {
                         JSObject event = new JSObject();
                         event.put("progress", percentage);
                         event.put("downloadedBytes", downloadedBytes);
@@ -276,7 +281,7 @@ public class LLMPlugin extends Plugin {
         return destination;
     }
 
-    private synchronized void downloadFile(String urlString, java.io.File outputFile, byte[] expectedDigest, ProgressCallback callback) throws Exception {
+    private synchronized void downloadFile(String urlString, java.io.File outputFile, byte[] expectedDigest, long maxBytes, ProgressCallback callback) throws Exception {
         java.io.File parent = outputFile.getParentFile();
         if (parent == null || !parent.isDirectory()) {
             throw new java.io.IOException("Download destination directory is unavailable");
@@ -350,6 +355,9 @@ public class LLMPlugin extends Plugin {
             }
 
             long expectedLength = connection.getContentLengthLong();
+            if (expectedLength > maxBytes) {
+                throw new java.io.IOException("Download exceeds the configured maximum of " + maxBytes + " bytes");
+            }
             temporaryFile = java.io.File.createTempFile("agathia-" + outputFile.getName() + ".", ".part", parent);
 
             long totalBytes = 0L;
@@ -361,6 +369,9 @@ public class LLMPlugin extends Plugin {
             ) {
                 int count;
                 while ((count = input.read(buffer)) != -1) {
+                    if (!ModelDownloadFiles.isWithinDownloadLimit(totalBytes, count, maxBytes)) {
+                        throw new java.io.IOException("Download exceeded the configured maximum of " + maxBytes + " bytes");
+                    }
                     output.write(buffer, 0, count);
                     if (digest != null) digest.update(buffer, 0, count);
                     totalBytes += (long) count;
