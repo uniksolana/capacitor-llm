@@ -42,6 +42,17 @@ public class ModelDownloadFilesTest {
     }
 
     @Test
+    public void enforcesDownloadByteLimitWithoutOverflow() {
+        assertTrue(ModelDownloadFiles.isWithinDownloadLimit(0L, 64 * 1024, 1024L));
+        assertTrue(ModelDownloadFiles.isWithinDownloadLimit(900L, 124, 1024L));
+        assertFalse(ModelDownloadFiles.isWithinDownloadLimit(900L, 125, 1024L));
+        assertFalse(ModelDownloadFiles.isWithinDownloadLimit(Long.MAX_VALUE, 1, Long.MAX_VALUE));
+        assertFalse(ModelDownloadFiles.isWithinDownloadLimit(-1L, 1, 1024L));
+        assertFalse(ModelDownloadFiles.isWithinDownloadLimit(0L, -1, 1024L));
+        assertFalse(ModelDownloadFiles.isWithinDownloadLimit(0L, 1, 0L));
+    }
+
+    @Test
     public void safelyIgnoresInvalidCleanupArguments() throws java.io.IOException {
         ModelDownloadFiles.cleanupStaleTemps(null);
     }
