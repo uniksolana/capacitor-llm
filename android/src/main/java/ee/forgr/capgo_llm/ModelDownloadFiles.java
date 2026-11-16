@@ -4,7 +4,16 @@ import java.io.File;
 import java.io.IOException;
 
 final class ModelDownloadFiles {
+    static final long DEFAULT_MAX_MODEL_BYTES = 4L * 1024L * 1024L * 1024L;
+    static final long ABSOLUTE_MAX_MODEL_BYTES = 8L * 1024L * 1024L * 1024L;
+    static final long MAX_COMPANION_BYTES = 512L * 1024L * 1024L;
+
     private ModelDownloadFiles() {}
+
+    static boolean isWithinDownloadLimit(long downloadedBytes, int incomingBytes, long maxBytes) {
+        return downloadedBytes >= 0L && incomingBytes >= 0 && maxBytes > 0L
+            && downloadedBytes <= maxBytes && (long) incomingBytes <= maxBytes - downloadedBytes;
+    }
 
     static boolean isAllowedRedirectProtocol(String currentProtocol, String nextProtocol) {
         boolean currentHttp = "http".equalsIgnoreCase(currentProtocol);
