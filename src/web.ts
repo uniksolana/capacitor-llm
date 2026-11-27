@@ -34,6 +34,18 @@ export class CapgoLLMWeb extends WebPlugin implements LLMPlugin {
   private modelPath = '';
   private modelType = 'task';
 
+  async loadEmbeddingModel(_options: { path: string; maxInputLength?: number }): Promise<{ ready: boolean }> {
+    throw new Error('Local embeddings are only available through the Android native runtime.');
+  }
+
+  async embedTexts(_options: { texts: string[]; outputSize?: number }): Promise<{ embeddings: number[][] }> {
+    throw new Error('Local embeddings are only available through the Android native runtime.');
+  }
+
+  async closeEmbeddingModel(): Promise<void> {
+    throw new Error('Local embeddings are only available through the Android native runtime.');
+  }
+
   async getReadiness(): Promise<{ readiness: string }> {
     return { readiness: this.readiness };
   }
