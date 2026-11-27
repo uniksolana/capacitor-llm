@@ -39,7 +39,7 @@ final class LocalEmbeddingRuntime {
         this.context = context.getApplicationContext();
     }
 
-    void load(String modelPath, int maxInputLength, Callback<Void> callback) {
+    void load(String modelPath, String expectedSha256, int maxInputLength, Callback<Void> callback) {
         executor.execute(() -> {
             EmbeddingEngine candidate = null;
             try {
@@ -50,8 +50,13 @@ final class LocalEmbeddingRuntime {
                     throw new IllegalArgumentException("maxInputLength debe estar entre 32 y 4096.");
                 }
                 File model = new File(modelPath).getCanonicalFile();
-                if (!model.isAbsolute() || !model.isFile() || !model.canRead() || model.length() <= 0L) {
-                    throw new IllegalArgumentException("El modelo de embeddings no existe o no se puede leer.");
+                File privateRoot = context.getFilesDir().getCanonicalFile();
+                String privatePrefix = privateRoot.getPath() + File.separator;
+                if (!model.getPath().startsWith(privatePrefix) || !model.isFile() || !model.canRead() || model.length() <= 0L) {
+                    throw new IllegalArgumentException("El modelo debe ser un archivo legible dentro del almacenamiento privado de la aplicación.");
+                }
+                if (expectedSha256 != null) {
+                    ModelFileIntegrity.verify(model, expectedSha256);
                 }
 
                 EmbeddingEngineConfig config = new EmbeddingEngineConfig(
