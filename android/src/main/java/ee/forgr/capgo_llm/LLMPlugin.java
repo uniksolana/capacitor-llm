@@ -438,13 +438,15 @@ public class LLMPlugin extends Plugin {
             call.reject("path is required");
             return;
         }
-        if (expectedSha256 != null) {
-            try {
-                ModelFileIntegrity.parseExpectedSha256(expectedSha256);
-            } catch (IllegalArgumentException error) {
-                call.reject(error.getMessage(), error);
-                return;
-            }
+        if (expectedSha256 == null || expectedSha256.isBlank()) {
+            call.reject("expectedSha256 is required for local embedding models");
+            return;
+        }
+        try {
+            ModelFileIntegrity.parseExpectedSha256(expectedSha256);
+        } catch (IllegalArgumentException error) {
+            call.reject(error.getMessage(), error);
+            return;
         }
         embeddingRuntime.load(path, expectedSha256, maxInputLength, new LocalEmbeddingRuntime.Callback<Void>() {
             @Override
