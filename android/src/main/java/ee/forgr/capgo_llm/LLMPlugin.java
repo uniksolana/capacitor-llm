@@ -448,7 +448,7 @@ public class LLMPlugin extends Plugin {
             }
             java.io.File modelFile = resolvePrivateDownloadFile(filesDir, filename);
             JSObject result = new JSObject();
-            boolean exists = modelFile.isFile() && modelFile.canRead() && modelFile.length() == expectedSize;
+            boolean exists = ModelDownloadFiles.isCompleteExistingModel(modelFile, expectedSize);
             result.put("exists", exists);
             if (exists) {
                 result.put("path", modelFile.getAbsolutePath());
