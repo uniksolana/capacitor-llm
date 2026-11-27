@@ -15,6 +15,16 @@ if (gradle.includes(oldRuntime)) {
   process.exit(1);
 }
 
+const oldKotlinPlugin = "classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:2.3.0'";
+const newKotlinPlugin = "classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:2.4.0'";
+if (gradle.includes(oldKotlinPlugin)) {
+  writeFileSync(gradlePath, readFileSync(gradlePath, 'utf8').replace(oldKotlinPlugin, newKotlinPlugin));
+} else if (!gradle.includes(newKotlinPlugin)) {
+  console.error('ERROR: no se encontró una versión compatible del Kotlin Gradle Plugin.');
+  process.exit(1);
+}
+console.log('android/build.gradle: Kotlin Gradle Plugin 2.4.0');
+
 const javaPath = 'android/src/main/java/ee/forgr/capgo_llm/LLM.java';
 const java = readFileSync(javaPath, 'utf8');
 
