@@ -8,7 +8,15 @@ The implementation uses `com.google.ai.edge.litertlm:litertlm-android:0.18.0`, w
 
 ## Model
 
-The intended candidate is the text-only EmbeddingGemma 2 270M LiteRT-LM bundle from the official `litert-community/embeddinggemma-2-text-270m-litert-lm` Hugging Face repository. Before enabling downloads, pin an immutable repository revision and independently confirm the exact artifact SHA-256. Do not use a floating `main` artifact or invent a checksum.
+The selected candidate is the text-only EmbeddingGemma 2 270M LiteRT-LM bundle from the official `litert-community/embeddinggemma-2-text-270m-litert-lm` Hugging Face repository. The model card describes support for 100+ languages, 270M parameters and a 165 MB CPU/GPU bundle. The artifact is pinned to the immutable repository commit that uploaded this file; its Git LFS pointer provides the exact size and SHA-256:
+
+- Revision: `8c9f652b5233a80313d5c848f3656e492cf0397f`
+- File: `embeddinggemma-2-text-270m.litertlm`
+- Exact size: `164626432` bytes
+- SHA-256: `2d079ee2f6f066b1f368e8d7c819f55214eaef1d0513b312321901f30ab286fb`
+- Immutable download URL: `https://huggingface.co/litert-community/embeddinggemma-2-text-270m-litert-lm/resolve/8c9f652b5233a80313d5c848f3656e492cf0397f/embeddinggemma-2-text-270m.litertlm`
+
+Do not replace this URL with a floating `main` URL without re-verifying the artifact and updating the pinned checksum.
 
 ## Lifecycle
 
@@ -45,5 +53,5 @@ The native API does not persist vectors: the consuming application owns document
 
 - Android native runtime only; web and iOS are not implemented.
 - No automatic model download or activation is performed by this plugin API.
-- Exact model revision and SHA-256 still need verification.
+- The pinned artifact has not yet been downloaded or exercised on the target phone.
 - Device performance, thermal behavior, memory use and retrieval quality require testing on the target Android device.
