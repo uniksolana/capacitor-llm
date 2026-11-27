@@ -1,4 +1,4 @@
-// Parche de Agathia OS para @capgo/capacitor-llm 8.2.1-agathia.9 + LiteRT-LM 0.17.0
+// Parche de Agathia OS para @capgo/capacitor-llm 8.2.1-agathia.9 + LiteRT-LM 0.18.0
 // 1) Motor LiteRT-LM solo texto: no cargar el Vision Encoder ni el de audio (visionBackend/audioBackend = null).
 // 2) Renombrar el paquete para publicarlo bajo el scope propio.
 // Si el código original no coincide, el script falla a propósito para no publicar nada roto.
@@ -7,7 +7,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 const gradlePath = 'android/build.gradle';
 const gradle = readFileSync(gradlePath, 'utf8');
 const oldRuntime = "implementation 'com.google.ai.edge.litertlm:litertlm-android:0.11.0'";
-const newRuntime = "implementation 'com.google.ai.edge.litertlm:litertlm-android:0.17.0'";
+const newRuntime = "implementation 'com.google.ai.edge.litertlm:litertlm-android:0.18.0'";
 if (gradle.includes(oldRuntime)) {
   writeFileSync(gradlePath, gradle.replace(oldRuntime, newRuntime));
 } else if (!gradle.includes(newRuntime)) {
