@@ -42,6 +42,23 @@ public class ModelDownloadFilesTest {
     }
 
     @Test
+    public void reusesOnlyReadableRegularFilesWithTheExactExpectedSize() throws Exception {
+        File exact = new File(temporaryFolder.getRoot(), "embedding.litertlm");
+        Files.write(exact.toPath(), "12345".getBytes(StandardCharsets.UTF_8));
+        File shortFile = new File(temporaryFolder.getRoot(), "short.litertlm");
+        Files.write(shortFile.toPath(), "1234".getBytes(StandardCharsets.UTF_8));
+        File directory = new File(temporaryFolder.getRoot(), "directory.litertlm");
+        assertTrue(directory.mkdir());
+
+        assertTrue(ModelDownloadFiles.isCompleteExistingModel(exact, 5L));
+        assertFalse(ModelDownloadFiles.isCompleteExistingModel(exact, 4L));
+        assertFalse(ModelDownloadFiles.isCompleteExistingModel(shortFile, 5L));
+        assertFalse(ModelDownloadFiles.isCompleteExistingModel(directory, 5L));
+        assertFalse(ModelDownloadFiles.isCompleteExistingModel(null, 5L));
+        assertFalse(ModelDownloadFiles.isCompleteExistingModel(exact, 0L));
+    }
+
+    @Test
     public void enforcesDownloadByteLimitWithoutOverflow() {
         assertTrue(ModelDownloadFiles.isWithinDownloadLimit(0L, 64 * 1024, 128L * 1024L));
         assertTrue(ModelDownloadFiles.isWithinDownloadLimit(900L, 124, 1024L));
