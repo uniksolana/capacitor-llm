@@ -48,15 +48,16 @@ final class LocalEmbeddingRuntime {
                 if (maxInputLength != 128 && maxInputLength != 256 && maxInputLength != 512 && maxInputLength != 1024 && maxInputLength != 2048) {
                     throw new IllegalArgumentException("maxInputLength debe ser uno de los tamaños admitidos por EmbeddingGemma 2.");
                 }
+                if (expectedSha256 == null) {
+                    throw new IllegalArgumentException("La huella SHA-256 del modelo es obligatoria.");
+                }
                 File model = new File(modelPath).getCanonicalFile();
                 File privateRoot = context.getFilesDir().getCanonicalFile();
                 String privatePrefix = privateRoot.getPath() + File.separator;
-                if (!model.getPath().startsWith(privatePrefix) || !model.isFile() || !model.canRead() || model.length() <= 0L) {
-                    throw new IllegalArgumentException("El modelo debe ser un archivo legible dentro del almacenamiento privado de la aplicación.");
+                if (!model.getPath().startsWith(privatePrefix) || !model.isFile() || !model.canRead() || model.length() <= 0L || !model.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".litertlm")) {
+                    throw new IllegalArgumentException("El modelo debe ser un archivo .litertlm legible dentro del almacenamiento privado de la aplicación.");
                 }
-                if (expectedSha256 != null) {
-                    ModelFileIntegrity.verify(model, expectedSha256);
-                }
+                ModelFileIntegrity.verify(model, expectedSha256);
 
                 EmbeddingEngineConfig config = new EmbeddingEngineConfig(
                     model.getAbsolutePath(),
