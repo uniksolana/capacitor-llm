@@ -138,17 +138,17 @@ public class LLMPlugin extends Plugin {
             call.reject("path is required");
             return;
         }
-        if (expectedSha256 == null) {
-            call.reject("expectedSha256 is required for local embedding models");
-            return;
-        }
-        {
+        // Preserve backwards compatibility: checksums are optional for the
+        // existing chat API, but are verified whenever callers provide one.
+        if (expectedSha256 != null && !expectedSha256.isBlank()) {
             try {
                 ModelFileIntegrity.parseExpectedSha256(expectedSha256);
             } catch (IllegalArgumentException exception) {
                 call.reject(exception.getMessage(), exception);
                 return;
             }
+        } else {
+            expectedSha256 = null;
         }
 
         // Extract model parameters
@@ -428,6 +428,37 @@ public class LLMPlugin extends Plugin {
         void onProgress(long downloadedBytes, long totalBytes, int percentage);
     }
 
+
+    @PluginMethod
+    public void findExistingModel(PluginCall call) {
+        String filename = call.getString("filename");
+        long expectedSize = call.getData().optLong("expectedSize", -1L);
+        if (filename == null || filename.isBlank() || !filename.toLowerCase(java.util.Locale.ROOT).endsWith(".litertlm")) {
+            call.reject("A .litertlm filename is required");
+            return;
+        }
+        if (expectedSize <= 0L || expectedSize > 200L * 1024L * 1024L) {
+            call.reject("expectedSize must be between 1 byte and 200 MiB");
+            return;
+        }
+        try {
+            java.io.File filesDir = getContext().getFilesDir();
+            if (filesDir == null || !filesDir.isDirectory()) {
+                throw new java.io.IOException("Private files directory is unavailable");
+            }
+            java.io.File modelFile = resolvePrivateDownloadFile(filesDir, filename);
+            JSObject result = new JSObject();
+            boolean exists = modelFile.isFile() && modelFile.canRead() && modelFile.length() == expectedSize;
+            result.put("exists", exists);
+            if (exists) {
+                result.put("path", modelFile.getAbsolutePath());
+                result.put("size", modelFile.length());
+            }
+            call.resolve(result);
+        } catch (Exception error) {
+            call.reject("Could not inspect the existing private embedding model", error);
+        }
+    }
 
     @PluginMethod
     public void loadEmbeddingModel(PluginCall call) {
