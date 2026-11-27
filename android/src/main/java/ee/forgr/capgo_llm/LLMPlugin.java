@@ -21,6 +21,15 @@ public class LLMPlugin extends Plugin {
         embeddingRuntime = new LocalEmbeddingRuntime(getContext());
     }
 
+    @Override
+    protected void handleOnDestroy() {
+        if (embeddingRuntime != null) {
+            embeddingRuntime.shutdown();
+            embeddingRuntime = null;
+        }
+        super.handleOnDestroy();
+    }
+
     @PluginMethod
     public void createChat(PluginCall call) {
         try {
