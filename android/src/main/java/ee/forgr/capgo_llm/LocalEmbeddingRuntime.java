@@ -28,8 +28,8 @@ final class LocalEmbeddingRuntime {
     private static final String TAG = "AgathiaEmbeddings";
     private static final int MAX_BATCH_SIZE = 16;
     private static final int MAX_TEXT_CHARS = 8000;
-    private static final int MIN_OUTPUT_SIZE = 32;
-    private static final int MAX_OUTPUT_SIZE = 4096;
+    private static final int DEFAULT_OUTPUT_SIZE = 512;
+    private static final int MAX_OUTPUT_SIZE = 768;
 
     private final Context context;
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -46,8 +46,8 @@ final class LocalEmbeddingRuntime {
                 if (modelPath == null || modelPath.isBlank()) {
                     throw new IllegalArgumentException("La ruta del modelo de embeddings es obligatoria.");
                 }
-                if (maxInputLength < 32 || maxInputLength > 4096) {
-                    throw new IllegalArgumentException("maxInputLength debe estar entre 32 y 4096.");
+                if (maxInputLength != 128 && maxInputLength != 256 && maxInputLength != 512 && maxInputLength != 1024 && maxInputLength != 2048 && maxInputLength != 8192) {
+                    throw new IllegalArgumentException("maxInputLength debe ser uno de los tamaños admitidos por EmbeddingGemma 2.");
                 }
                 File model = new File(modelPath).getCanonicalFile();
                 File privateRoot = context.getFilesDir().getCanonicalFile();
@@ -85,7 +85,7 @@ final class LocalEmbeddingRuntime {
         });
     }
 
-    void embedTexts(List<String> texts, int outputSize, Callback<List<float[]>> callback) {
+    void embedTexts(List<String> texts, List<String> titles, String taskType, int outputSize, Callback<List<float[]>> callback) {
         executor.execute(() -> {
             try {
                 EmbeddingEngine active = engine;
@@ -95,8 +95,14 @@ final class LocalEmbeddingRuntime {
                 if (texts == null || texts.isEmpty() || texts.size() > MAX_BATCH_SIZE) {
                     throw new IllegalArgumentException("El lote debe contener entre 1 y " + MAX_BATCH_SIZE + " textos.");
                 }
-                if (outputSize < MIN_OUTPUT_SIZE || outputSize > MAX_OUTPUT_SIZE) {
-                    throw new IllegalArgumentException("outputSize debe estar entre 32 y 4096.");
+                if (outputSize != 128 && outputSize != 256 && outputSize != 512 && outputSize != 768) {
+                    throw new IllegalArgumentException("outputSize debe ser 128, 256, 512 o 768.");
+                }
+                if (!"query".equals(taskType) && !"document".equals(taskType)) {
+                    throw new IllegalArgumentException("taskType debe ser query o document.");
+                }
+                if ("document".equals(taskType) && (titles == null || titles.size() != texts.size())) {
+                    throw new IllegalArgumentException("Se necesita un título por cada fragmento documental.");
                 }
 
                 List<List<InputData>> batch = new ArrayList<>(texts.size());
@@ -104,7 +110,16 @@ final class LocalEmbeddingRuntime {
                     if (text == null || text.isBlank() || text.length() > MAX_TEXT_CHARS) {
                         throw new IllegalArgumentException("Cada texto debe contener entre 1 y " + MAX_TEXT_CHARS + " caracteres.");
                     }
-                    batch.add(Collections.singletonList(new InputData.Text(text)));
+                    String prefixedText;
+                    if ("query".equals(taskType)) {
+                        prefixedText = "task: search result | query: " + text;
+                    } else {
+                        String title = titles.get(batch.size());
+                        if (title == null || title.isBlank()) title = "none";
+                        if (title.length() > 512) title = title.substring(0, 512);
+                        prefixedText = "title: " + title + " | text: " + text;
+                    }
+                    batch.add(Collections.singletonList(new InputData.Text(prefixedText)));
                 }
 
                 List<EmbeddingResponse> responses = active.computeEmbeddingBatch(
@@ -118,15 +133,23 @@ final class LocalEmbeddingRuntime {
                 List<float[]> vectors = new ArrayList<>(responses.size());
                 for (EmbeddingResponse response : responses) {
                     float[] vector = response.getEmbedding();
-                    if (vector == null || vector.length < MIN_OUTPUT_SIZE || vector.length > MAX_OUTPUT_SIZE) {
+                    if (vector == null || vector.length != outputSize) {
                         throw new IllegalStateException("El motor devolvió un vector con dimensiones no válidas.");
                     }
+                    double squaredNorm = 0d;
                     for (float value : vector) {
                         if (Float.isNaN(value) || Float.isInfinite(value)) {
                             throw new IllegalStateException("El motor devolvió un vector con valores no finitos.");
                         }
+                        squaredNorm += (double) value * (double) value;
                     }
-                    vectors.add(vector);
+                    double norm = Math.sqrt(squaredNorm);
+                    if (!Double.isFinite(norm) || norm <= 1e-12d) {
+                        throw new IllegalStateException("El motor devolvió un vector sin norma válida.");
+                    }
+                    float[] normalized = vector.clone();
+                    for (int i = 0; i < normalized.length; i++) normalized[i] = (float) (normalized[i] / norm);
+                    vectors.add(normalized);
                 }
                 callback.onSuccess(vectors);
             } catch (Exception error) {
