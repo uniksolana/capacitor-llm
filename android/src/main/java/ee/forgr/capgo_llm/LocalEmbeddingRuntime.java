@@ -46,7 +46,7 @@ final class LocalEmbeddingRuntime {
                 if (modelPath == null || modelPath.isBlank()) {
                     throw new IllegalArgumentException("La ruta del modelo de embeddings es obligatoria.");
                 }
-                if (maxInputLength != 128 && maxInputLength != 256 && maxInputLength != 512 && maxInputLength != 1024 && maxInputLength != 2048 && maxInputLength != 8192) {
+                if (maxInputLength != 128 && maxInputLength != 256 && maxInputLength != 512 && maxInputLength != 1024 && maxInputLength != 2048) {
                     throw new IllegalArgumentException("maxInputLength debe ser uno de los tamaños admitidos por EmbeddingGemma 2.");
                 }
                 File model = new File(modelPath).getCanonicalFile();
@@ -74,9 +74,15 @@ final class LocalEmbeddingRuntime {
                 candidate.initialize();
 
                 EmbeddingEngine previous = engine;
+                if (previous != null && previous.isInitialized()) {
+                    try {
+                        previous.close();
+                    } catch (Exception closeError) {
+                        throw new IllegalStateException("No se pudo sustituir de forma segura el modelo de embeddings anterior.", closeError);
+                    }
+                }
                 engine = candidate;
                 candidate = null;
-                closeQuietly(previous);
                 callback.onSuccess(null);
             } catch (Exception error) {
                 closeQuietly(candidate);
@@ -161,9 +167,9 @@ final class LocalEmbeddingRuntime {
     void close(Callback<Void> callback) {
         executor.execute(() -> {
             EmbeddingEngine previous = engine;
-            engine = null;
             try {
                 if (previous != null && previous.isInitialized()) previous.close();
+                engine = null;
                 callback.onSuccess(null);
             } catch (Exception error) {
                 Log.e(TAG, "No se pudo liberar el motor de embeddings", error);
