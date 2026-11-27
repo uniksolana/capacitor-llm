@@ -1,8 +1,19 @@
-// Parche de Agathia OS para @capgo/capacitor-llm 8.2.1-agathia.8 + LiteRT-LM 0.11.0
+// Parche de Agathia OS para @capgo/capacitor-llm 8.2.1-agathia.9 + LiteRT-LM 0.17.0
 // 1) Motor LiteRT-LM solo texto: no cargar el Vision Encoder ni el de audio (visionBackend/audioBackend = null).
 // 2) Renombrar el paquete para publicarlo bajo el scope propio.
 // Si el código original no coincide, el script falla a propósito para no publicar nada roto.
 import { readFileSync, writeFileSync } from 'node:fs';
+
+const gradlePath = 'android/build.gradle';
+const gradle = readFileSync(gradlePath, 'utf8');
+const oldRuntime = "implementation 'com.google.ai.edge.litertlm:litertlm-android:0.11.0'";
+const newRuntime = "implementation 'com.google.ai.edge.litertlm:litertlm-android:0.17.0'";
+if (gradle.includes(oldRuntime)) {
+  writeFileSync(gradlePath, gradle.replace(oldRuntime, newRuntime));
+} else if (!gradle.includes(newRuntime)) {
+  console.error('ERROR: no se encontró la versión esperada de LiteRT-LM.');
+  process.exit(1);
+}
 
 const javaPath = 'android/src/main/java/ee/forgr/capgo_llm/LLM.java';
 const java = readFileSync(javaPath, 'utf8');
@@ -28,16 +39,16 @@ if (!versionPattern.test(plugin)) {
   process.exit(1);
 }
 if (!plugin.includes("public void closeChat(PluginCall call)")) { console.error("ERROR: falta closeChat en LLMPlugin.java."); process.exit(1); }
-const expectedPluginVersion = 'private final String pluginVersion = "8.2.1-agathia.8";';
+const expectedPluginVersion = 'private final String pluginVersion = "8.2.1-agathia.9";';
 const pluginPatched = plugin.replace(versionPattern, expectedPluginVersion);
 if (pluginPatched !== plugin) {
   writeFileSync(pluginPath, pluginPatched);
 }
-console.log('LLMPlugin.java: pluginVersion = 8.2.1-agathia.8');
+console.log('LLMPlugin.java: pluginVersion = 8.2.1-agathia.9');
 
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 pkg.name = '@uniksolana/capacitor-llm';
-pkg.version = '8.2.1-agathia.8';
+pkg.version = '8.2.1-agathia.9';
 // npm provenance requires the package repository URL to match the GitHub
 // repository that produced the build. Keep this patch idempotent.
 pkg.repository = {
