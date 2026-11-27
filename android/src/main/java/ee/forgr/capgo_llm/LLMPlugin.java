@@ -419,12 +419,21 @@ public class LLMPlugin extends Plugin {
     @PluginMethod
     public void loadEmbeddingModel(PluginCall call) {
         String path = call.getString("path");
+        String expectedSha256 = call.getString("expectedSha256");
         Integer maxInputLength = call.getInt("maxInputLength", 512);
         if (path == null || path.isBlank()) {
             call.reject("path is required");
             return;
         }
-        embeddingRuntime.load(path, maxInputLength, new LocalEmbeddingRuntime.Callback<Void>() {
+        if (expectedSha256 != null) {
+            try {
+                ModelFileIntegrity.parseExpectedSha256(expectedSha256);
+            } catch (IllegalArgumentException error) {
+                call.reject(error.getMessage(), error);
+                return;
+            }
+        }
+        embeddingRuntime.load(path, expectedSha256, maxInputLength, new LocalEmbeddingRuntime.Callback<Void>() {
             @Override
             public void onSuccess(Void ignored) {
                 JSObject result = new JSObject();
