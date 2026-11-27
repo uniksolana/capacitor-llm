@@ -9,14 +9,16 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 @CapacitorPlugin(name = "CapgoLLM")
 public class LLMPlugin extends Plugin {
 
-    private final String pluginVersion = "8.2.1-agathia.7";
+    private final String pluginVersion = "8.2.1-agathia.9";
 
     private LLM llm;
+    private LocalEmbeddingRuntime embeddingRuntime;
 
     @Override
     public void load() {
         super.load();
         llm = LLM.getInstance(getContext());
+        embeddingRuntime = new LocalEmbeddingRuntime(getContext());
     }
 
     @PluginMethod
@@ -411,6 +413,89 @@ public class LLMPlugin extends Plugin {
 
     interface ProgressCallback {
         void onProgress(long downloadedBytes, long totalBytes, int percentage);
+    }
+
+
+    @PluginMethod
+    public void loadEmbeddingModel(PluginCall call) {
+        String path = call.getString("path");
+        Integer maxInputLength = call.getInt("maxInputLength", 512);
+        if (path == null || path.isBlank()) {
+            call.reject("path is required");
+            return;
+        }
+        embeddingRuntime.load(path, maxInputLength, new LocalEmbeddingRuntime.Callback<Void>() {
+            @Override
+            public void onSuccess(Void ignored) {
+                JSObject result = new JSObject();
+                result.put("ready", true);
+                call.resolve(result);
+            }
+
+            @Override
+            public void onError(Exception error) {
+                call.reject("Failed to load local embedding model: " + error.getMessage(), error);
+            }
+        });
+    }
+
+    @PluginMethod
+    public void embedTexts(PluginCall call) {
+        org.json.JSONArray input = call.getData().optJSONArray("texts");
+        Integer outputSize = call.getInt("outputSize", 768);
+        if (input == null || input.length() == 0 || input.length() > 16) {
+            call.reject("texts must contain between 1 and 16 strings");
+            return;
+        }
+        java.util.List<String> texts = new java.util.ArrayList<>(input.length());
+        try {
+            for (int i = 0; i < input.length(); i++) {
+                Object value = input.get(i);
+                if (!(value instanceof String)) {
+                    call.reject("Every item in texts must be a string");
+                    return;
+                }
+                texts.add((String) value);
+            }
+        } catch (org.json.JSONException error) {
+            call.reject("Could not read texts", error);
+            return;
+        }
+
+        embeddingRuntime.embedTexts(texts, outputSize, new LocalEmbeddingRuntime.Callback<java.util.List<float[]>>() {
+            @Override
+            public void onSuccess(java.util.List<float[]> vectors) {
+                org.json.JSONArray resultVectors = new org.json.JSONArray();
+                for (float[] vector : vectors) {
+                    org.json.JSONArray values = new org.json.JSONArray();
+                    for (float value : vector) values.put(value);
+                    resultVectors.put(values);
+                }
+                JSObject result = new JSObject();
+                result.put("embeddings", resultVectors);
+                call.resolve(result);
+            }
+
+            @Override
+            public void onError(Exception error) {
+                call.reject("Local embedding generation failed: " + error.getMessage(), error);
+            }
+        });
+    }
+
+    @PluginMethod
+    public void closeEmbeddingModel(PluginCall call) {
+        embeddingRuntime.close(new LocalEmbeddingRuntime.Callback<Void>() {
+            @Override
+            public void onSuccess(Void ignored) {
+                call.resolve();
+            }
+
+            @Override
+            public void onError(Exception error) {
+                call.reject("Failed to close local embedding model: " + error.getMessage(), error);
+            }
+        });
     }
 
     @PluginMethod
