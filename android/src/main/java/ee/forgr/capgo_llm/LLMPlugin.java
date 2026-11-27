@@ -451,12 +451,26 @@ public class LLMPlugin extends Plugin {
     @PluginMethod
     public void embedTexts(PluginCall call) {
         org.json.JSONArray input = call.getData().optJSONArray("texts");
-        Integer outputSize = call.getInt("outputSize", 768);
+        org.json.JSONArray titleInput = call.getData().optJSONArray("titles");
+        String taskType = call.getString("taskType");
+        if (taskType == null) taskType = "query";
+        Integer outputSize = call.getInt("outputSize", 512);
         if (input == null || input.length() == 0 || input.length() > 16) {
             call.reject("texts must contain between 1 and 16 strings");
             return;
         }
         java.util.List<String> texts = new java.util.ArrayList<>(input.length());
+        java.util.List<String> titles = null;
+        if ("document".equals(taskType)) {
+            if (titleInput == null || titleInput.length() != input.length()) {
+                call.reject("document taskType requires one title per text");
+                return;
+            }
+            titles = new java.util.ArrayList<>(titleInput.length());
+        } else if (!"query".equals(taskType)) {
+            call.reject("taskType must be query or document");
+            return;
+        }
         try {
             for (int i = 0; i < input.length(); i++) {
                 Object value = input.get(i);
@@ -465,13 +479,21 @@ public class LLMPlugin extends Plugin {
                     return;
                 }
                 texts.add((String) value);
+                if (titles != null) {
+                    Object title = titleInput.get(i);
+                    if (title != org.json.JSONObject.NULL && !(title instanceof String)) {
+                        call.reject("Every item in titles must be a string or null");
+                        return;
+                    }
+                    titles.add(title == org.json.JSONObject.NULL ? null : (String) title);
+                }
             }
         } catch (org.json.JSONException error) {
             call.reject("Could not read texts", error);
             return;
         }
 
-        embeddingRuntime.embedTexts(texts, outputSize, new LocalEmbeddingRuntime.Callback<java.util.List<float[]>>() {
+        embeddingRuntime.embedTexts(texts, titles, taskType, outputSize, new LocalEmbeddingRuntime.Callback<java.util.List<float[]>>() {
             @Override
             public void onSuccess(java.util.List<float[]> vectors) {
                 org.json.JSONArray resultVectors = new org.json.JSONArray();
