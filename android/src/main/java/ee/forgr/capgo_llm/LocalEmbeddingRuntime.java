@@ -28,7 +28,6 @@ final class LocalEmbeddingRuntime {
     private static final String TAG = "AgathiaEmbeddings";
     private static final int MAX_BATCH_SIZE = 16;
     private static final int MAX_TEXT_CHARS = 8000;
-    private static final int DEFAULT_OUTPUT_SIZE = 512;
     private static final int MAX_OUTPUT_SIZE = 768;
 
     private final Context context;
@@ -174,6 +173,20 @@ final class LocalEmbeddingRuntime {
             } catch (Exception error) {
                 Log.e(TAG, "No se pudo liberar el motor de embeddings", error);
                 callback.onError(error);
+            }
+        });
+    }
+
+    void shutdown() {
+        executor.execute(() -> {
+            EmbeddingEngine previous = engine;
+            try {
+                if (previous != null && previous.isInitialized()) previous.close();
+                engine = null;
+            } catch (Exception error) {
+                Log.e(TAG, "No se pudo liberar el motor de embeddings al destruir el plugin", error);
+            } finally {
+                executor.shutdown();
             }
         });
     }
