@@ -34,11 +34,11 @@ export class CapgoLLMWeb extends WebPlugin implements LLMPlugin {
   private modelPath = '';
   private modelType = 'task';
 
-  async loadEmbeddingModel(_options: { path: string; maxInputLength?: number }): Promise<{ ready: boolean }> {
+  async loadEmbeddingModel(_options: { path: string; expectedSha256: string; maxInputLength?: number }): Promise<{ ready: boolean }> {
     throw new Error('Local embeddings are only available through the Android native runtime.');
   }
 
-  async embedTexts(_options: { texts: string[]; outputSize?: number }): Promise<{ embeddings: number[][] }> {
+  async embedTexts(_options: { texts: string[]; taskType?: 'query' | 'document'; titles?: Array<string | null>; outputSize?: 128 | 256 | 512 | 768 }): Promise<{ embeddings: number[][] }> {
     throw new Error('Local embeddings are only available through the Android native runtime.');
   }
 
