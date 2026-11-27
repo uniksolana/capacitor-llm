@@ -24,7 +24,7 @@ export interface LLMPlugin {
   /**
    * Loads an independent local embedding model on Android.
    */
-  loadEmbeddingModel(options: { path: string; expectedSha256?: string; maxInputLength?: number }): Promise<{ ready: boolean }>;
+  loadEmbeddingModel(options: { path: string; expectedSha256: string; maxInputLength?: number }): Promise<{ ready: boolean }>;
 
   /**
    * Computes normalized local embeddings for a batch of texts on Android.
