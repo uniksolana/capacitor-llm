@@ -29,7 +29,7 @@ export interface LLMPlugin {
   /**
    * Computes normalized local embeddings for a batch of texts on Android.
    */
-  embedTexts(options: { texts: string[]; outputSize?: number }): Promise<{ embeddings: number[][] }>;
+  embedTexts(options: { texts: string[]; taskType?: 'query' | 'document'; titles?: Array<string | null>; outputSize?: 128 | 256 | 512 | 768 }): Promise<{ embeddings: number[][] }>;
 
   /**
    * Releases the local embedding model and its native resources.
