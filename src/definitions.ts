@@ -22,6 +22,11 @@ export interface LLMPlugin {
   closeChat(options: { chatId: string }): Promise<void>;
 
   /**
+   * Finds an existing complete model file in app-private storage.
+   */
+  findExistingModel(options: { filename: string; expectedSize: number }): Promise<{ exists: boolean; path?: string; size?: number }>;
+
+  /**
    * Loads an independent local embedding model on Android.
    */
   loadEmbeddingModel(options: { path: string; expectedSha256: string; maxInputLength?: number }): Promise<{ ready: boolean }>;
