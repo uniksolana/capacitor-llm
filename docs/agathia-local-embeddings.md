@@ -20,21 +20,31 @@ Do not replace this URL with a floating `main` URL without re-verifying the arti
 
 ## Lifecycle
 
-Download the model with the existing private downloader, then load it:
+On startup, first look for a complete private copy. If it is absent or has the wrong size, download the pinned artifact; the native loader always verifies SHA-256 before use:
 
 ```ts
-const downloaded = await CapgoLLM.downloadModel({
-  url: EMBEDDING_MODEL_URL,
+const existing = await CapgoLLM.findExistingModel({
   filename: 'embeddinggemma-2-text-270m.litertlm',
-  expectedSha256: EMBEDDING_MODEL_SHA256,
+  expectedSize: 164626432,
 });
 
+const modelPath = existing.exists
+  ? existing.path!
+  : (await CapgoLLM.downloadModel({
+      url: EMBEDDING_MODEL_URL,
+      filename: 'embeddinggemma-2-text-270m.litertlm',
+      expectedSha256: EMBEDDING_MODEL_SHA256,
+      maxBytes: 200000000,
+    })).path;
+
 await CapgoLLM.loadEmbeddingModel({
-  path: downloaded.path,
+  path: modelPath,
   expectedSha256: EMBEDDING_MODEL_SHA256,
   maxInputLength: 512,
 });
 ```
+
+The lookup only checks that a regular readable file with the exact expected size exists in app-private storage. It is not an integrity check; the native loader verifies the SHA-256 before initializing the engine.
 
 The SHA-256 is mandatory and rechecked immediately before native initialization. The loader requires a readable `.litertlm` file inside the application's private files directory. Loading and inference run on a dedicated serial background executor using CPU (two threads). The embedding engine has an independent lifecycle and can be closed without affecting chat.
 
