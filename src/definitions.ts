@@ -22,6 +22,21 @@ export interface LLMPlugin {
   closeChat(options: { chatId: string }): Promise<void>;
 
   /**
+   * Loads an independent local embedding model on Android.
+   */
+  loadEmbeddingModel(options: { path: string; maxInputLength?: number }): Promise<{ ready: boolean }>;
+
+  /**
+   * Computes normalized local embeddings for a batch of texts on Android.
+   */
+  embedTexts(options: { texts: string[]; outputSize?: number }): Promise<{ embeddings: number[][] }>;
+
+  /**
+   * Releases the local embedding model and its native resources.
+   */
+  closeEmbeddingModel(): Promise<void>;
+
+  /**
    * Gets the readiness status of the LLM
    * @returns Promise with readiness status string
    */
