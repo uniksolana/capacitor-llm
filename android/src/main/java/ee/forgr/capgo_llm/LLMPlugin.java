@@ -542,15 +542,19 @@ public class LLMPlugin extends Plugin {
         embeddingRuntime.embedTexts(texts, titles, taskType, outputSize, new LocalEmbeddingRuntime.Callback<java.util.List<float[]>>() {
             @Override
             public void onSuccess(java.util.List<float[]> vectors) {
-                org.json.JSONArray resultVectors = new org.json.JSONArray();
-                for (float[] vector : vectors) {
-                    org.json.JSONArray values = new org.json.JSONArray();
-                    for (float value : vector) values.put(value);
-                    resultVectors.put(values);
+                try {
+                    org.json.JSONArray resultVectors = new org.json.JSONArray();
+                    for (float[] vector : vectors) {
+                        org.json.JSONArray values = new org.json.JSONArray();
+                        for (float value : vector) values.put(value);
+                        resultVectors.put(values);
+                    }
+                    JSObject result = new JSObject();
+                    result.put("embeddings", resultVectors);
+                    call.resolve(result);
+                } catch (org.json.JSONException error) {
+                    call.reject("Could not serialize local embeddings", error);
                 }
-                JSObject result = new JSObject();
-                result.put("embeddings", resultVectors);
-                call.resolve(result);
             }
 
             @Override
