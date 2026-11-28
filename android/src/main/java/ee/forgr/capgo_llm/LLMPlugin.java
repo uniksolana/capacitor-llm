@@ -576,6 +576,33 @@ public class LLMPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void getDeviceResources(PluginCall call) {
+        try {
+            java.io.File filesDir = getContext().getFilesDir();
+            if (filesDir == null || !filesDir.isDirectory()) {
+                throw new java.io.IOException("Private files directory is unavailable");
+            }
+            android.app.ActivityManager activityManager =
+                (android.app.ActivityManager) getContext().getSystemService(android.content.Context.ACTIVITY_SERVICE);
+            if (activityManager == null) {
+                throw new java.io.IOException("Android memory diagnostics are unavailable");
+            }
+            android.app.ActivityManager.MemoryInfo memoryInfo = new android.app.ActivityManager.MemoryInfo();
+            activityManager.getMemoryInfo(memoryInfo);
+            android.os.StatFs storage = new android.os.StatFs(filesDir.getAbsolutePath());
+
+            JSObject result = new JSObject();
+            result.put("availableStorageBytes", storage.getAvailableBytes());
+            result.put("totalMemoryBytes", memoryInfo.totalMem);
+            result.put("availableMemoryBytes", memoryInfo.availMem);
+            result.put("processorCount", Runtime.getRuntime().availableProcessors());
+            call.resolve(result);
+        } catch (Exception error) {
+            call.reject("Could not read reliable Android device resources", error);
+        }
+    }
+
+    @PluginMethod
     public void getPluginVersion(final PluginCall call) {
         try {
             final JSObject ret = new JSObject();
