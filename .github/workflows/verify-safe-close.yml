@@ -7,6 +7,7 @@ on:
   pull_request:
     branches:
       - fix/agathia-safe-conversation-close
+      - fix/agathia-safe-download-io
       - main
 permissions:
   contents: read
