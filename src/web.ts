@@ -34,6 +34,10 @@ export class CapgoLLMWeb extends WebPlugin implements LLMPlugin {
   private modelPath = '';
   private modelType = 'task';
 
+  async getDeviceResources(): Promise<{ availableStorageBytes: number; totalMemoryBytes: number; availableMemoryBytes: number; processorCount: number }> {
+    throw new Error('Reliable device resource diagnostics for local embeddings are only available on Android.');
+  }
+
   async findExistingModel(_options: { filename: string; expectedSize: number }): Promise<{ exists: boolean; path?: string; size?: number }> {
     throw new Error('Inspecting private native model storage is only available on Android.');
   }
