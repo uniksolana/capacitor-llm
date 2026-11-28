@@ -172,6 +172,13 @@ export class CapgoLLMWeb extends WebPlugin implements LLMPlugin {
 
   async downloadModel(options: DownloadModelOptions): Promise<DownloadModelResult> {
     try {
+      // This adapter does not persist model bytes and Web Crypto has no
+      // bounded-memory streaming digest API. Never buffer a multi-GB model just
+      // to claim integrity verification in the browser.
+      if (options.expectedSha256) {
+        throw new Error('MODEL_CHECKSUM_UNAVAILABLE: bounded-memory SHA-256 verification is only implemented by the native Android downloader');
+      }
+
       // For web, we'll simulate download by fetching and storing in IndexedDB or returning the URL
       const response = await fetch(options.url, {
         method: 'GET',

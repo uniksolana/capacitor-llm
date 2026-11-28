@@ -154,6 +154,10 @@ export interface GenerationErrorEvent {
 export interface DownloadModelOptions {
   /** URL of the model file to download */
   url: string;
+  /** Optional expected SHA-256 hex digest. Android verifies it while streaming before atomically replacing the destination. */
+  expectedSha256?: string;
+  /** Optional maximum download size in bytes. Android enforces it against Content-Length and every streamed chunk. Defaults to 4 GiB for models; companion files are capped at 512 MiB. */
+  maxBytes?: number;
   /** Optional: URL of a companion file for legacy model formats */
   companionUrl?: string;
   /** Optional: Custom filename (defaults to filename from URL) */
@@ -197,6 +201,8 @@ export interface ReadinessChangeEvent {
 export interface ModelOptions {
   /** Model path, "Apple Intelligence" for the Apple system model on iOS, or "Gemini Nano" for the Android AICore system model when already available on the device. On iOS, custom `.litertlm` models require the plugin to be integrated through Swift Package Manager. Gemma 4 examples use `.litertlm` on mobile and `*-web.task` on web. */
   path: string;
+  /** Optional expected SHA-256 hex digest. Android verifies the file immediately before initializing a LiteRT-LM engine. */
+  expectedSha256?: string;
   /** Optional. Model file type/extension (for example `task`, `bin`, `litertlm`, `gemini-nano`, or `gemini-nano-agent`). If not provided, it is extracted from the path. On iOS, LiteRT-LM is selected only when this resolves to `litertlm`; all other custom types keep the legacy MediaPipe compatibility path. */
   modelType?: string;
   /** Maximum number of tokens the model handles */
