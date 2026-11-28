@@ -48,6 +48,10 @@ The lookup only checks that a regular readable file with the exact expected size
 
 The SHA-256 is mandatory and rechecked immediately before native initialization. The loader requires a readable `.litertlm` file inside the application's private files directory. Loading and inference run on a dedicated serial background executor using CPU (two threads). The embedding engine has an independent lifecycle and can be closed without affecting chat.
 
+## Device resource preflight
+
+`getDeviceResources()` reports only local Android resource counters: available bytes in the app-private files partition, total and currently available RAM from `ActivityManager.MemoryInfo`, and the available processor count. The consuming app combines these with its IndexedDB quota estimate before offering model preparation. Unknown or insufficient readings must fail closed; a browser-side estimate alone is not proof of free space for the native model file.
+
 ## Retrieval embeddings
 
 `embedTexts` accepts batches of 1–16 strings, with a maximum of 8,000 characters per input. The API applies EmbeddingGemma retrieval prefixes:
