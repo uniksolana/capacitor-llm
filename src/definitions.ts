@@ -22,6 +22,17 @@ export interface LLMPlugin {
   closeChat(options: { chatId: string }): Promise<void>;
 
   /**
+   * Reads native Android free storage, total/available RAM and processor count.
+   * Used for conservative on-device model preflight; no personal data is returned.
+   */
+  getDeviceResources(): Promise<{
+    availableStorageBytes: number;
+    totalMemoryBytes: number;
+    availableMemoryBytes: number;
+    processorCount: number;
+  }>;
+
+  /**
    * Finds an existing complete model file in app-private storage.
    */
   findExistingModel(options: { filename: string; expectedSize: number }): Promise<{ exists: boolean; path?: string; size?: number }>;
