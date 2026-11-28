@@ -10,6 +10,11 @@ final class ModelDownloadFiles {
 
     private ModelDownloadFiles() {}
 
+    static boolean isCompleteExistingModel(File modelFile, long expectedSize) {
+        return modelFile != null && expectedSize > 0L && modelFile.isFile()
+            && modelFile.canRead() && modelFile.length() == expectedSize;
+    }
+
     static boolean isWithinDownloadLimit(long downloadedBytes, int incomingBytes, long maxBytes) {
         return downloadedBytes >= 0L && incomingBytes >= 0 && maxBytes > 0L
             && downloadedBytes <= maxBytes && (long) incomingBytes <= maxBytes - downloadedBytes;

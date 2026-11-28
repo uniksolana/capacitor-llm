@@ -4,6 +4,7 @@ on:
     branches:
       - fix/agathia-safe-conversation-close
       - fix/agathia-safe-download-io
+      - feat/agathia-local-embeddings
   pull_request:
     branches:
       - fix/agathia-safe-conversation-close

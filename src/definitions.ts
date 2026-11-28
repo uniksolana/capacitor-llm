@@ -22,6 +22,37 @@ export interface LLMPlugin {
   closeChat(options: { chatId: string }): Promise<void>;
 
   /**
+   * Reads native Android free storage, total/available RAM and processor count.
+   * Used for conservative on-device model preflight; no personal data is returned.
+   */
+  getDeviceResources(): Promise<{
+    availableStorageBytes: number;
+    totalMemoryBytes: number;
+    availableMemoryBytes: number;
+    processorCount: number;
+  }>;
+
+  /**
+   * Finds an existing complete model file in app-private storage.
+   */
+  findExistingModel(options: { filename: string; expectedSize: number }): Promise<{ exists: boolean; path?: string; size?: number }>;
+
+  /**
+   * Loads an independent local embedding model on Android.
+   */
+  loadEmbeddingModel(options: { path: string; expectedSha256: string; maxInputLength?: number }): Promise<{ ready: boolean }>;
+
+  /**
+   * Computes normalized local embeddings for a batch of texts on Android.
+   */
+  embedTexts(options: { texts: string[]; taskType?: 'query' | 'document'; titles?: Array<string | null>; outputSize?: 128 | 256 | 512 | 768 }): Promise<{ embeddings: number[][] }>;
+
+  /**
+   * Releases the local embedding model and its native resources.
+   */
+  closeEmbeddingModel(): Promise<void>;
+
+  /**
    * Gets the readiness status of the LLM
    * @returns Promise with readiness status string
    */

@@ -9,14 +9,25 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 @CapacitorPlugin(name = "CapgoLLM")
 public class LLMPlugin extends Plugin {
 
-    private final String pluginVersion = "8.2.1-agathia.7";
+    private final String pluginVersion = "8.2.1-agathia.9";
 
     private LLM llm;
+    private LocalEmbeddingRuntime embeddingRuntime;
 
     @Override
     public void load() {
         super.load();
         llm = LLM.getInstance(getContext());
+        embeddingRuntime = new LocalEmbeddingRuntime(getContext());
+    }
+
+    @Override
+    protected void handleOnDestroy() {
+        if (embeddingRuntime != null) {
+            embeddingRuntime.shutdown();
+            embeddingRuntime = null;
+        }
+        super.handleOnDestroy();
     }
 
     @PluginMethod
@@ -127,13 +138,17 @@ public class LLMPlugin extends Plugin {
             call.reject("path is required");
             return;
         }
-        if (expectedSha256 != null) {
+        // Preserve backwards compatibility: checksums are optional for the
+        // existing chat API, but are verified whenever callers provide one.
+        if (expectedSha256 != null && !expectedSha256.isBlank()) {
             try {
                 ModelFileIntegrity.parseExpectedSha256(expectedSha256);
             } catch (IllegalArgumentException exception) {
                 call.reject(exception.getMessage(), exception);
                 return;
             }
+        } else {
+            expectedSha256 = null;
         }
 
         // Extract model parameters
@@ -411,6 +426,184 @@ public class LLMPlugin extends Plugin {
 
     interface ProgressCallback {
         void onProgress(long downloadedBytes, long totalBytes, int percentage);
+    }
+
+
+    @PluginMethod
+    public void findExistingModel(PluginCall call) {
+        String filename = call.getString("filename");
+        long expectedSize = call.getData().optLong("expectedSize", -1L);
+        if (filename == null || filename.isBlank() || !filename.toLowerCase(java.util.Locale.ROOT).endsWith(".litertlm")) {
+            call.reject("A .litertlm filename is required");
+            return;
+        }
+        if (expectedSize <= 0L || expectedSize > 200L * 1024L * 1024L) {
+            call.reject("expectedSize must be between 1 byte and 200 MiB");
+            return;
+        }
+        try {
+            java.io.File filesDir = getContext().getFilesDir();
+            if (filesDir == null || !filesDir.isDirectory()) {
+                throw new java.io.IOException("Private files directory is unavailable");
+            }
+            java.io.File modelFile = resolvePrivateDownloadFile(filesDir, filename);
+            JSObject result = new JSObject();
+            boolean exists = ModelDownloadFiles.isCompleteExistingModel(modelFile, expectedSize);
+            result.put("exists", exists);
+            if (exists) {
+                result.put("path", modelFile.getAbsolutePath());
+                result.put("size", modelFile.length());
+            }
+            call.resolve(result);
+        } catch (Exception error) {
+            call.reject("Could not inspect the existing private embedding model", error);
+        }
+    }
+
+    @PluginMethod
+    public void loadEmbeddingModel(PluginCall call) {
+        String path = call.getString("path");
+        String expectedSha256 = call.getString("expectedSha256");
+        Integer maxInputLength = call.getInt("maxInputLength", 512);
+        if (path == null || path.isBlank()) {
+            call.reject("path is required");
+            return;
+        }
+        if (expectedSha256 == null || expectedSha256.isBlank()) {
+            call.reject("expectedSha256 is required for local embedding models");
+            return;
+        }
+        try {
+            ModelFileIntegrity.parseExpectedSha256(expectedSha256);
+        } catch (IllegalArgumentException error) {
+            call.reject(error.getMessage(), error);
+            return;
+        }
+        embeddingRuntime.load(path, expectedSha256, maxInputLength, new LocalEmbeddingRuntime.Callback<Void>() {
+            @Override
+            public void onSuccess(Void ignored) {
+                JSObject result = new JSObject();
+                result.put("ready", true);
+                call.resolve(result);
+            }
+
+            @Override
+            public void onError(Exception error) {
+                call.reject("Failed to load local embedding model: " + error.getMessage(), error);
+            }
+        });
+    }
+
+    @PluginMethod
+    public void embedTexts(PluginCall call) {
+        org.json.JSONArray input = call.getData().optJSONArray("texts");
+        org.json.JSONArray titleInput = call.getData().optJSONArray("titles");
+        String taskType = call.getString("taskType");
+        if (taskType == null) taskType = "query";
+        Integer outputSize = call.getInt("outputSize", 512);
+        if (input == null || input.length() == 0 || input.length() > 16) {
+            call.reject("texts must contain between 1 and 16 strings");
+            return;
+        }
+        java.util.List<String> texts = new java.util.ArrayList<>(input.length());
+        java.util.List<String> titles = null;
+        if ("document".equals(taskType)) {
+            if (titleInput == null || titleInput.length() != input.length()) {
+                call.reject("document taskType requires one title per text");
+                return;
+            }
+            titles = new java.util.ArrayList<>(titleInput.length());
+        } else if (!"query".equals(taskType)) {
+            call.reject("taskType must be query or document");
+            return;
+        }
+        try {
+            for (int i = 0; i < input.length(); i++) {
+                Object value = input.get(i);
+                if (!(value instanceof String)) {
+                    call.reject("Every item in texts must be a string");
+                    return;
+                }
+                texts.add((String) value);
+                if (titles != null) {
+                    Object title = titleInput.get(i);
+                    if (title != org.json.JSONObject.NULL && !(title instanceof String)) {
+                        call.reject("Every item in titles must be a string or null");
+                        return;
+                    }
+                    titles.add(title == org.json.JSONObject.NULL ? null : (String) title);
+                }
+            }
+        } catch (org.json.JSONException error) {
+            call.reject("Could not read texts", error);
+            return;
+        }
+
+        embeddingRuntime.embedTexts(texts, titles, taskType, outputSize, new LocalEmbeddingRuntime.Callback<java.util.List<float[]>>() {
+            @Override
+            public void onSuccess(java.util.List<float[]> vectors) {
+                try {
+                    org.json.JSONArray resultVectors = new org.json.JSONArray();
+                    for (float[] vector : vectors) {
+                        org.json.JSONArray values = new org.json.JSONArray();
+                        for (float value : vector) values.put(value);
+                        resultVectors.put(values);
+                    }
+                    JSObject result = new JSObject();
+                    result.put("embeddings", resultVectors);
+                    call.resolve(result);
+                } catch (org.json.JSONException error) {
+                    call.reject("Could not serialize local embeddings", error);
+                }
+            }
+
+            @Override
+            public void onError(Exception error) {
+                call.reject("Local embedding generation failed: " + error.getMessage(), error);
+            }
+        });
+    }
+
+    @PluginMethod
+    public void closeEmbeddingModel(PluginCall call) {
+        embeddingRuntime.close(new LocalEmbeddingRuntime.Callback<Void>() {
+            @Override
+            public void onSuccess(Void ignored) {
+                call.resolve();
+            }
+
+            @Override
+            public void onError(Exception error) {
+                call.reject("Failed to close local embedding model: " + error.getMessage(), error);
+            }
+        });
+    }
+
+    @PluginMethod
+    public void getDeviceResources(PluginCall call) {
+        try {
+            java.io.File filesDir = getContext().getFilesDir();
+            if (filesDir == null || !filesDir.isDirectory()) {
+                throw new java.io.IOException("Private files directory is unavailable");
+            }
+            android.app.ActivityManager activityManager =
+                (android.app.ActivityManager) getContext().getSystemService(android.content.Context.ACTIVITY_SERVICE);
+            if (activityManager == null) {
+                throw new java.io.IOException("Android memory diagnostics are unavailable");
+            }
+            android.app.ActivityManager.MemoryInfo memoryInfo = new android.app.ActivityManager.MemoryInfo();
+            activityManager.getMemoryInfo(memoryInfo);
+            android.os.StatFs storage = new android.os.StatFs(filesDir.getAbsolutePath());
+
+            JSObject result = new JSObject();
+            result.put("availableStorageBytes", storage.getAvailableBytes());
+            result.put("totalMemoryBytes", memoryInfo.totalMem);
+            result.put("availableMemoryBytes", memoryInfo.availMem);
+            result.put("processorCount", Runtime.getRuntime().availableProcessors());
+            call.resolve(result);
+        } catch (Exception error) {
+            call.reject("Could not read reliable Android device resources", error);
+        }
     }
 
     @PluginMethod
