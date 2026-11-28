@@ -50,7 +50,7 @@ The SHA-256 is mandatory and rechecked immediately before native initialization.
 
 ## Device resource preflight
 
-`getDeviceResources()` reports only local Android resource counters: available bytes in the app-private files partition, total and currently available RAM from `ActivityManager.MemoryInfo`, and the available processor count. The consuming app combines these with its IndexedDB quota estimate before offering model preparation. Unknown or insufficient readings must fail closed; a browser-side estimate alone is not proof of free space for the native model file.
+`getDeviceResources()` reports only local Android resource counters: available bytes in the app-private files partition, total and currently available RAM from `ActivityManager.MemoryInfo`, and the available processor count. The consuming app combines these with its IndexedDB quota estimate before offering model preparation. Unknown or insufficient readings must fail closed; a browser-side estimate alone is not proof of free space for the native model file. Agathia's current consumer-side policy additionally requires at least 6 GiB total RAM, 1.5 GB currently available RAM, four logical processors, and free storage sufficient for the model plus the estimated vector index and safety margin. These thresholds are app policy, not hard-coded plugin restrictions.
 
 ## Retrieval embeddings
 
