@@ -720,7 +720,14 @@ public class LLM {
             samplerConfig,
             defaults.getAutomaticToolCalling(),
             defaults.getChannels(),
-            defaults.getExtraContext()
+            defaults.getExtraContext(),
+            defaults.getLoraConfig(),
+            defaults.getPrefillPrefaceOnInit(),
+            defaults.getMaxOutputToken(),
+            defaults.getThinkingConfig(),
+            defaults.getEnableResponseFormat(),
+            defaults.getEnableSpeculativeDecoding(),
+            defaults.getChatTemplate()
         );
         return engine.createConversation(config);
     }
